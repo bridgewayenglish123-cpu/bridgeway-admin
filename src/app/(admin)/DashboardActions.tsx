@@ -79,7 +79,7 @@ export default function DashboardActions({ todayFull, studentById, teacherById, 
   const [isPending, startTransition] = useTransition();
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [localStatus, setLocalStatus] = useState<Record<string, "completed" | "cancelled">>({});
+  const [localStatus, setLocalStatus] = useState<Record<string, "scheduled" | "completed" | "cancelled">>({});
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
