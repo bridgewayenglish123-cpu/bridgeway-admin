@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { C } from "@/lib/constants";
 import { todayYMD, weekRange, money } from "@/lib/utils";
-import { isPostHanneCutoff } from "@/lib/domain";
+import { isPostHanneCutoff, effectiveLeeCommission } from "@/lib/domain";
 import type { Lesson, Student, Teacher, Account, PriceRule, PayoutSnapshot } from "@/lib/supabase/types";
 import PageIntro from "@/components/ui/PageIntro";
 import Card from "@/components/ui/Card";
@@ -43,7 +44,7 @@ type ModalState =
   | { kind: "substitute"; lessons: Lesson[]; account: PartialAccount }
   | { kind: "undo-sub"; lesson: Lesson }
   | { kind: "batch-cancel"; lessons: Lesson[] }
-  | { kind: "batch-substitute"; lessons: Lesson[] };
+
 
 function Toast({ msg, ok }: { msg: string; ok: boolean }) {
   return (
@@ -63,19 +64,17 @@ const CLASS_TYPE_TONE: Record<string, "gray" | "amber" | "navy"> = {
   general: "gray", makeup: "amber", extension: "navy",
 };
 
-function effectiveLee(snap: PayoutSnapshot, date: string): number {
-  const stored = snap.lee_commission_ntd || 0;
-  if (isPostHanneCutoff(date)) return stored + (snap.hanne_share_ntd || 0);
-  return stored;
-}
 
-export default function LessonsClient({ lessons, students, teachers, accounts, priceRules }: Props) {
+export default function LessonsClient(
+// router injected
+{ lessons, students, teachers, accounts, priceRules }: Props) {
   const [tab, setTab] = useState<Tab>("today");
   const [search, setSearch] = useState("");
   const [showCancelled, setShowCancelled] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [modal, setModal] = useState<ModalState>({ kind: "none" });
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [noteEdit, setNoteEdit] = useState("");
@@ -129,16 +128,6 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
     });
   }, [lessons, tab, search, showCancelled, today, wk, studentById, teacherById]);
 
-  // 同一 date+time 分組找出團體課
-  const groupKey = (l: Lesson) => `${l.date}__${l.time || ""}`;
-  const groupCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const l of filtered) {
-      const k = groupKey(l);
-      counts[k] = (counts[k] || 0) + 1;
-    }
-    return counts;
-  }, [filtered]);
 
   // 選取
   const toggleSelect = (id: string) =>
@@ -334,7 +323,6 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
           count={selected.size}
           onComplete={handleBatchComplete}
           onCancel={handleBatchCancel}
-          onSubstitute={() => setModal({ kind: "batch-substitute", lessons: selectedLessons })}
           onClear={clearSelect}
           isPending={isPending}
         />
@@ -368,9 +356,8 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
               const student = studentById[l.student_id];
               const teacher = teacherById[l.teacher_id || ""];
               const origTeacher = teacherById[l.original_teacher_id || ""];
-              const isGroup = groupCounts[groupKey(l)] > 1;
               const snap = l.payout_snapshot || {} as PayoutSnapshot;
-              const leeFee = effectiveLee(snap, l.date);
+              const leeFee = effectiveLeeCommission(l);
               const isCompleted = l.status === "completed";
               const isCancelled = l.status === "cancelled";
               const isScheduled = l.status === "scheduled";
@@ -404,9 +391,6 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
                   <Td>
                     <div className="font-medium text-sm" style={{ color: C.navy }}>
                       {student?.zh_name || "—"}
-                      {isGroup && (
-                        <Badge tone="navy">團體</Badge>
-                      )}
                     </div>
                     {student?.en_name && (
                       <div className="text-xs" style={{ color: C.muted }}>{student.en_name}</div>
@@ -423,9 +407,14 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
                     )}
                   </Td>
                   <Td>
-                    <Badge tone={CLASS_TYPE_TONE[l.class_type] || "gray"}>
-                      {CLASS_TYPE_LABEL[l.class_type] || l.class_type}
-                    </Badge>
+                    <div className="flex gap-1 flex-wrap">
+                      <Badge tone={CLASS_TYPE_TONE[l.class_type] || "gray"}>
+                        {CLASS_TYPE_LABEL[l.class_type] || l.class_type}
+                      </Badge>
+                      {l.is_substitute && (
+                        <Badge tone="amber">代課</Badge>
+                      )}
+                    </div>
                   </Td>
                   <Td>
                     <Badge
@@ -508,7 +497,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
                           ↺ 改回待上
                         </Btn>
                       )}
-                      {l.is_substitute && isScheduled && (
+                      {l.is_substitute && !isCancelled && (
                         <Btn kind="ghost" size="sm" onClick={() => handleUndoSub(l)}>
                           撤銷代課
                         </Btn>
@@ -566,10 +555,10 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
         </div>
       )}
 
-      {(modal.kind === "substitute" || modal.kind === "batch-substitute") && (
+      {modal.kind === "substitute" && (
         <SubstituteModal
-          lessons={modal.kind === "substitute" ? modal.lessons : modal.lessons}
-          account={modal.kind === "substitute" ? modal.account : accountById[modal.lessons[0]?.account_id || ""] || accounts[0]}
+          lessons={modal.lessons}
+          account={modal.account}
           teachers={teachers}
           priceRules={priceRules}
           onDone={(msg) => { showToast(msg); clearSelect(); closeModal(); }}
@@ -586,9 +575,14 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
         >
           <div className="w-full max-w-sm rounded-2xl p-5 space-y-4" style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}>
             <h3 className="text-base font-semibold" style={{ color: C.navy }}>撤銷代課？</h3>
-            <p className="text-sm" style={{ color: C.text }}>
-              將還原原始老師與費率結構,代課紀錄會被清除。
-            </p>
+            <div className="text-sm whitespace-pre-line" style={{ color: C.text }}>
+              {`確定要撤銷這筆代課紀錄?
+
+目前老師:${teacherById[modal.lesson.teacher_id || ""]?.teacher_name || "—"}
+原老師:${teacherById[modal.lesson.original_teacher_id || ""]?.teacher_name || "—"}
+
+撤銷後老師與費用結構會還原成原本設定。`}
+            </div>
             <div className="flex justify-end gap-2">
               <Btn kind="ghost" size="sm" onClick={closeModal}>取消</Btn>
               <Btn kind="danger" size="sm" disabled={isPending} onClick={() => confirmUndoSub(modal.lesson)}>

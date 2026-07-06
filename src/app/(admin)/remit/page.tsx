@@ -18,7 +18,7 @@ async function loadData() {
     lessons: (lessonsRes.data || []) as Lesson[],
     periods: (remitRes.data || []) as RemittancePeriod[],
     extras: (extrasRes.data || []) as RemittanceExtra[],
-    phpRate: (metaRes.data?.php_rate || 1.8) as number,
+    phpRate: (typeof metaRes.data?.php_rate === "number" && metaRes.data.php_rate > 0 ? metaRes.data.php_rate : 1.8),
   };
 }
 

@@ -10,7 +10,6 @@ import Badge from "@/components/ui/Badge";
 import { Table, Td } from "@/components/ui/Table";
 import Empty from "@/components/ui/Empty";
 import RuleModal from "./RuleModal";
-import BatchModal from "./BatchModal";
 import {
   toggleScheduleRule,
   deleteScheduleRule,
@@ -35,7 +34,6 @@ type ModalState =
   | { kind: "none" }
   | { kind: "add" }
   | { kind: "edit"; rule: ScheduleRule }
-  | { kind: "batch" }
   | { kind: "confirm-generate-all" }
   | { kind: "confirm-toggle"; rule: ScheduleRule }
   | { kind: "confirm-delete"; rule: ScheduleRule }
@@ -166,8 +164,7 @@ export default function ScheduleClient({ rules, accounts, students, teachers, le
         <div className="flex items-end justify-between flex-wrap gap-3">
           <h2 className="text-2xl md:text-3xl" style={{ color: C.navy }}>排課管理</h2>
           <div className="flex gap-2 flex-wrap">
-            <Btn kind="ghost" size="md" onClick={() => setModal({ kind: "batch" })}>批次排課</Btn>
-            <Btn kind="gold" size="md" onClick={() => setModal({ kind: "confirm-generate-all" })}>
+<Btn kind="gold" size="md" onClick={() => setModal({ kind: "confirm-generate-all" })}>
               一次生成全部
             </Btn>
             <Btn kind="primary" size="md" onClick={() => setModal({ kind: "add" })}>＋ 新增規則</Btn>
@@ -343,18 +340,6 @@ export default function ScheduleClient({ rules, accounts, students, teachers, le
       {(modal.kind === "add" || modal.kind === "edit") && (
         <RuleModal
           rule={modal.kind === "edit" ? modal.rule : null}
-          accounts={accounts}
-          students={students}
-          teachers={teachers}
-          lessons={lessons}
-          onDone={(msg) => { showToast(msg); closeModal(); }}
-          onError={(msg) => showToast(msg, false)}
-          onClose={closeModal}
-        />
-      )}
-
-      {modal.kind === "batch" && (
-        <BatchModal
           accounts={accounts}
           students={students}
           teachers={teachers}

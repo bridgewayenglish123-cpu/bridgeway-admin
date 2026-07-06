@@ -38,7 +38,6 @@ interface Props {
 type ModalState =
   | { kind: "none" }
   | { kind: "open"; prefillStudentId?: string }
-  | { kind: "convert"; account: Account }
   | { kind: "flex"; account: Account }
   | { kind: "confirm-close"; account: Account }
   | { kind: "confirm-reopen"; account: Account }
@@ -75,22 +74,24 @@ const STATUS_TONE: Record<string, "green" | "gold" | "gray" | "navy"> = {
 // ── 開課表單 ──────────────────────────────────────────────────────────────────
 function OpenAccountForm({
   students, teachers, priceRules, prefillStudentId,
-  onSave, onCancel, isPending, isConvert,
+  prefillRuleCode, prefillNote,
+  onSave, onCancel, isPending,
 }: {
   students: PartialStudent[];
   teachers: PartialTeacher[];
   priceRules: PriceRule[];
   prefillStudentId?: string;
+  prefillRuleCode?: string;
+  prefillNote?: string;
   onSave: (input: OpenAccountInput) => void;
   onCancel: () => void;
   isPending: boolean;
-  isConvert?: boolean;
 }) {
   const [studentId, setStudentId] = useState(prefillStudentId || "");
-  const [ruleCode, setRuleCode] = useState("");
+  const [ruleCode, setRuleCode] = useState(prefillRuleCode || "");
   const [courseLabel, setCourseLabel] = useState("");
   const [paymentDate, setPaymentDate] = useState(todayYMD());
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState(prefillNote || "");
   const [manualLessons, setManualLessons] = useState("");
 
   const activeStudents = students.filter((s) => s.status === "Active" || s.status === "Paused");
@@ -129,8 +130,7 @@ function OpenAccountForm({
 
   return (
     <div className="space-y-3">
-      {!isConvert && (
-        <div>
+              <div>
           <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
             學生 <span style={{ color: C.red }}>*</span>
           </label>
@@ -148,7 +148,7 @@ function OpenAccountForm({
             ))}
           </select>
         </div>
-      )}
+
       <div>
         <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>價格方案</label>
         <select
@@ -229,7 +229,7 @@ function OpenAccountForm({
       <div className="flex justify-end gap-2 pt-1">
         <Btn kind="ghost" size="sm" onClick={onCancel} disabled={isPending}>取消</Btn>
         <Btn kind="primary" size="sm" disabled={!canSave || isPending} onClick={handleSave}>
-          {isPending ? "開課中…" : isConvert ? "轉為正式課程" : "開課"}
+          {isPending ? "開課中…" : "開課"}
         </Btn>
       </div>
     </div>
@@ -475,6 +475,9 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [filterStudent, setFilterStudent] = useState("");
+  const [convertPrefill, setConvertPrefill] = useState<{
+    studentId: string; ruleCode: string; note: string;
+  } | null>(null);
   const [filterTab, setFilterTab] = useState<"active" | "closed" | "all">("active");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   
@@ -492,6 +495,34 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
     setTimeout(() => setToast(null), 3500);
   };
   const closeModal = () => setModal({ kind: "none" });
+
+  // #D1 試聽轉正:找建議方案並預填開課 Modal
+  const convertTrialToFormal = (trialAccount: Account) => {
+    const candidateRules = priceRules
+      .filter((r) =>
+        r.active_status === "Active" &&
+        r.billing_type === "Package" &&
+        r.teacher_type === trialAccount.teacher_type
+      )
+      .sort((a, b) => {
+        if (a.duration_type === "Short25" && a.lesson_count === 8) return -1;
+        if (b.duration_type === "Short25" && b.lesson_count === 8) return 1;
+        if (a.duration_type !== b.duration_type)
+          return a.duration_type === "Short25" ? -1 : 1;
+        return a.lesson_count - b.lesson_count;
+      });
+    const suggested = candidateRules[0];
+    if (!suggested) {
+      showToast("找不到適合的正式方案,請先到「價格規則」新增", false);
+      return;
+    }
+    setConvertPrefill({
+      studentId: trialAccount.student_id,
+      ruleCode: suggested.price_rule_code,
+      note: `由試聽帳戶轉正式(${studentById[trialAccount.student_id]?.zh_name || ""})`,
+    });
+    setModal({ kind: "open" });
+  };
 
   const studentById = Object.fromEntries(students.map((s) => [s.id, s]));
   const teacherById = useMemo(() => Object.fromEntries(teachers.map((t) => [t.id, t])), [teachers]);
@@ -541,14 +572,6 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
       const res = await openAccount(input);
       if (res.error) showToast(res.error, false);
       else { showToast("課程帳戶已開立"); closeModal(); }
-    });
-  };
-
-  const handleConvert = (acc: Account, input: OpenAccountInput) => {
-    startTransition(async () => {
-      const res = await convertTrialToFull(acc.id, input);
-      if (res.error) showToast(res.error, false);
-      else { showToast("已轉為正式課程並關閉試聽帳戶"); closeModal(); }
     });
   };
 
@@ -696,7 +719,7 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
                   <Td>
                     <div className="flex gap-1 flex-wrap">
                       {st === "Trial" && getCompleted(acc.id) >= 1 && (
-                        <Btn kind="gold" size="sm" onClick={() => setModal({ kind: "convert", account: acc })}>
+                        <Btn kind="gold" size="sm" onClick={() => convertTrialToFormal(acc)}>
                           轉正式
                         </Btn>
                       )}
@@ -737,31 +760,32 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
       </Card>
 
       {/* ── Modals ── */}
-      {(modal.kind === "open" || modal.kind === "convert") && (
+      {modal.kind === "open" && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: "rgba(10,30,54,0.55)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
+          onClick={(e) => { if (e.target === e.currentTarget) { closeModal(); setConvertPrefill(null); } }}
         >
           <div
             className="w-full max-w-md rounded-2xl p-5 md:p-6 space-y-4 overflow-y-auto"
             style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)", maxHeight: "92vh" }}
           >
             <h3 className="text-base font-semibold" style={{ color: C.navy }}>
-              {modal.kind === "convert" ? `試聽轉正式 · ${modal.account.course_label}` : "開新課程"}
+              {convertPrefill ? "試聽轉正式" : "開新課程"}
             </h3>
             <OpenAccountForm
               students={students}
               teachers={teachers}
               priceRules={priceRules}
-              prefillStudentId={modal.kind === "convert" ? modal.account.student_id : modal.prefillStudentId}
+              prefillStudentId={convertPrefill?.studentId || modal.prefillStudentId}
+              prefillRuleCode={convertPrefill?.ruleCode}
+              prefillNote={convertPrefill?.note}
               onSave={(input) => {
-                if (modal.kind === "convert") handleConvert(modal.account, input);
-                else handleOpenAccount(input);
+                setConvertPrefill(null);
+                handleOpenAccount(input);
               }}
-              onCancel={closeModal}
+              onCancel={() => { closeModal(); setConvertPrefill(null); }}
               isPending={isPending}
-              isConvert={modal.kind === "convert"}
             />
           </div>
         </div>

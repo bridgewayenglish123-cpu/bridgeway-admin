@@ -7,12 +7,12 @@ interface Props {
   count: number;
   onComplete: () => void;
   onCancel: () => void;
-  onSubstitute: () => void;
   onClear: () => void;
   isPending: boolean;
 }
 
-export default function BatchBar({ count, onComplete, onCancel, onSubstitute, onClear, isPending }: Props) {
+export default function BatchBar({ count, onComplete, onCancel,
+ onClear, isPending }: Props) {
   return (
     <div
       className="sticky top-0 z-20 rounded-xl px-4 py-3 flex items-center justify-between flex-wrap gap-3"
@@ -28,14 +28,6 @@ export default function BatchBar({ count, onComplete, onCancel, onSubstitute, on
         <Btn kind="ghost" size="sm" onClick={onClear} disabled={isPending}>
           取消選取
         </Btn>
-        <button
-          onClick={onSubstitute}
-          disabled={isPending}
-          className="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-90 disabled:opacity-40"
-          style={{ background: C.gold, color: "#fff" }}
-        >
-          批次代課
-        </button>
         <button
           onClick={onCancel}
           disabled={isPending}

@@ -449,7 +449,7 @@ export default function TeachersClient({ teachers, stats }: Props) {
                 <h3 className="text-base font-semibold" style={{ color: C.red }}>
                   刪除 {modal.teacher.teacher_name}？
                 </h3>
-                <div className="rounded-lg p-3 text-sm" style={{ background: C.amberSoft, color: C.amber }}>
+                <div className="rounded-lg p-3 text-sm whitespace-pre-line" style={{ background: C.amberSoft, color: C.amber }}>
                   ⚠ 建議改用「停用」而非刪除,停用可保留師資紀錄。
                   只有在確定永久移除時才需要刪除。
                 </div>
