@@ -3,7 +3,8 @@
 import { useState, useTransition, useMemo } from "react";
 import { C } from "@/lib/constants";
 import { todayYMD } from "@/lib/utils";
-import type { Student, Teacher, Account, Lesson, StudentStatus } from "@/lib/supabase/types";
+import type { Student, Teacher, Account, Lesson, Enrollment, StudentStatus } from "@/lib/supabase/types";
+import DetailModal from "./DetailModal";
 import PageIntro from "@/components/ui/PageIntro";
 import Card from "@/components/ui/Card";
 import Btn from "@/components/ui/Btn";
@@ -24,6 +25,7 @@ interface Props {
   teachers: PartialTeacher[];
   accounts: PartialAccount[];
   lessons: PartialLesson[];
+  enrollments: Pick<Enrollment, "id" | "student_id" | "snapshot">[];
 }
 
 type ModalState =
@@ -152,72 +154,214 @@ function StudentForm({
   );
 }
 
-function CsvImportPanel({ onDone, onCancel }: { onDone: (msg: string) => void; onCancel: () => void }) {
-  const [raw, setRaw] = useState("");
+function CsvImportPanel({
+  onDone, onCancel, existingNames,
+}: {
+  onDone: (msg: string) => void;
+  onCancel: () => void;
+  existingNames: Set<string>;
+}) {
+  const [step, setStep] = useState<"select" | "preview">("select");
   const [isPending, start] = useTransition();
-  const [preview, setPreview] = useState<string[][]>([]);
+  const [parseResult, setParseResult] = useState<{
+    rows: { zh_name: string; en_name: string | null; zoom_email: string | null; contact_info: string | null; age: string | null; status: string }[];
+    errors: { line: number; msg: string }[];
+    skipped: { line: number; name: string }[];
+  } | null>(null);
 
-  const parse = (text: string) =>
-    text.trim().split("\n").filter(Boolean).map((l) => l.split(",").map((c) => c.trim()));
+  const statusMap: Record<string, string> = {
+    "在學": "Active", "暫停": "Paused", "結束": "Closed",
+    "active": "Active", "paused": "Paused", "closed": "Closed",
+  };
+
+  const parseLine = (line: string): string[] => {
+    const cells: string[] = [];
+    let current = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') {
+        if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+        else inQuotes = !inQuotes;
+      } else if (c === "," && !inQuotes) {
+        cells.push(current); current = "";
+      } else { current += c; }
+    }
+    cells.push(current);
+    return cells.map((c) => c.trim());
+  };
+
+  const parseCsv = (text: string) => {
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    const lines = text.split(/\r?\n/).filter((l) => l.trim());
+    if (lines.length < 2) return { rows: [], errors: [{ line: 1, msg: "檔案內容不足" }], skipped: [] };
+
+    const headers = parseLine(lines[0]).map((h) => h.toLowerCase());
+    const findIdx = (candidates: string[]) =>
+      candidates.map((c) => c.toLowerCase()).map((c) => headers.indexOf(c)).find((i) => i >= 0) ?? -1;
+
+    const idx = {
+      zh_name: findIdx(["中文姓名", "姓名", "zh_name", "name"]),
+      en_name: findIdx(["英文名", "en_name"]),
+      zoom_email: findIdx(["email", "zoom_email", "zoom"]),
+      contact_info: findIdx(["聯絡方式", "contact_info", "contact"]),
+      age: findIdx(["年齡", "age"]),
+      status: findIdx(["狀態", "status"]),
+    };
+
+    if (idx.zh_name < 0) {
+      return { rows: [], errors: [{ line: 1, msg: "找不到「中文姓名」欄位,請確認 CSV 標題列" }], skipped: [] };
+    }
+
+    const rows: { zh_name: string; en_name: string | null; zoom_email: string | null; contact_info: string | null; age: string | null; status: string }[] = [];
+    const errors: { line: number; msg: string }[] = [];
+    const skipped: { line: number; name: string }[] = [];
+    const newNames = new Set<string>();
+
+    for (let i = 1; i < lines.length; i++) {
+      const cells = parseLine(lines[i]);
+      const zh_name = cells[idx.zh_name]?.trim();
+      if (!zh_name) { errors.push({ line: i + 1, msg: "中文姓名為空" }); continue; }
+      if (existingNames.has(zh_name) || newNames.has(zh_name)) {
+        skipped.push({ line: i + 1, name: zh_name }); continue;
+      }
+      newNames.add(zh_name);
+      const statusRaw = idx.status >= 0 ? (cells[idx.status]?.trim() || "") : "";
+      const status = statusMap[statusRaw] || statusMap[statusRaw.toLowerCase()] || "Active";
+      rows.push({
+        zh_name,
+        en_name: idx.en_name >= 0 ? cells[idx.en_name]?.trim() || null : null,
+        zoom_email: idx.zoom_email >= 0 ? cells[idx.zoom_email]?.trim() || null : null,
+        contact_info: idx.contact_info >= 0 ? cells[idx.contact_info]?.trim() || null : null,
+        age: idx.age >= 0 ? cells[idx.age]?.trim() || null : null,
+        status,
+      });
+    }
+    return { rows, errors, skipped };
+  };
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      const result = parseCsv(text);
+      setParseResult(result);
+      setStep("preview");
+    };
+    reader.readAsText(file, "utf-8");
+  };
 
   const handleImport = () => {
-    const rows = parse(raw).map((cols) => ({
-      zh_name: cols[0] || "", en_name: cols[1] || "",
-      zoom_email: cols[2] || "", contact_info: cols[3] || "", age: cols[4] || "",
-    })).filter((r) => r.zh_name);
+    if (!parseResult || parseResult.rows.length === 0) return;
     start(async () => {
-      const res = await importStudentsCSV(rows);
+      const res = await importStudentsCSV(parseResult.rows as any);
       if (res.error) onDone("匯入失敗:" + res.error);
       else onDone(`成功匯入 ${res.count} 位學生`);
     });
   };
 
   return (
-    <div className="space-y-3">
-      <div className="text-xs rounded-lg p-3" style={{ background: "#EAF0F6", color: C.navy, lineHeight: 1.8 }}>
-        <strong>CSV 格式</strong>(逗號分隔,每行一位):<br />
-        中文姓名, 英文名, Zoom Email, 聯絡資訊, 年齡
-      </div>
-      <textarea className="w-full rounded-lg border px-3 py-2 text-sm font-mono resize-none"
-        style={{ borderColor: C.line, color: C.text }} rows={6}
-        value={raw} onChange={(e) => { setRaw(e.target.value); setPreview([]); }} />
-      {preview.length > 0 && (
-        <div className="text-xs rounded-lg overflow-auto" style={{ border: `1px solid ${C.line}`, maxHeight: 160 }}>
-          <table className="w-full" style={{ borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ background: "#EAF0F6" }}>
-                {["中文姓名","英文名","Zoom","聯絡","年齡"].map((h) => (
-                  <th key={h} className="px-2 py-1 text-left" style={{ color: C.muted }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {preview.filter((r) => r[0]).map((row, i) => (
-                <tr key={i} style={{ borderTop: `1px solid ${C.line}` }}>
-                  {[0,1,2,3,4].map((ci) => (
-                    <td key={ci} className="px-2 py-1" style={{ color: C.text }}>{row[ci] || "—"}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+    <div className="space-y-4">
+      {step === "select" && (
+        <>
+          <div className="rounded-lg p-3 text-xs" style={{ background: "#EAF0F6", color: C.navy, lineHeight: 1.9 }}>
+            <div><strong>支援中英欄名:</strong> 中文姓名 / zh_name / name / 姓名</div>
+            <div><strong>狀態欄:</strong> 在學 / 暫停 / 結束(或 Active/Paused/Closed),不填預設在學</div>
+            <div><strong>去重:</strong> 同名學生自動略過,不會重複建立</div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>選擇 CSV 檔案</label>
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              onChange={handleFile}
+              className="w-full text-sm"
+              style={{ color: C.text }}
+            />
+          </div>
+          <div className="flex justify-end">
+            <Btn kind="ghost" size="sm" onClick={onCancel}>取消</Btn>
+          </div>
+        </>
       )}
-      <div className="flex justify-end gap-2">
-        <Btn kind="ghost" size="sm" onClick={onCancel}>取消</Btn>
-        {preview.length === 0 ? (
-          <Btn kind="ghost" size="sm" disabled={!raw.trim()} onClick={() => setPreview(parse(raw))}>預覽</Btn>
-        ) : (
-          <Btn kind="primary" size="sm" disabled={isPending} onClick={handleImport}>
-            {isPending ? "匯入中…" : `匯入 ${preview.filter((r) => r[0]).length} 位`}
-          </Btn>
-        )}
-      </div>
+
+      {step === "preview" && parseResult && (
+        <>
+          {/* 統計 */}
+          <div className="flex gap-3 text-sm flex-wrap">
+            <span style={{ color: C.green }}>新增 {parseResult.rows.length} 位</span>
+            {parseResult.skipped.length > 0 && (
+              <span style={{ color: C.amber }}>略過重複 {parseResult.skipped.length} 位</span>
+            )}
+            {parseResult.errors.length > 0 && (
+              <span style={{ color: C.red }}>錯誤 {parseResult.errors.length} 筆</span>
+            )}
+          </div>
+
+          {/* 錯誤 */}
+          {parseResult.errors.length > 0 && (
+            <div className="rounded-lg p-3 text-xs space-y-1" style={{ background: C.redSoft, color: C.red }}>
+              {parseResult.errors.map((e, i) => (
+                <div key={i}>第 {e.line} 列:{e.msg}</div>
+              ))}
+            </div>
+          )}
+
+          {/* 略過 */}
+          {parseResult.skipped.length > 0 && (
+            <div className="rounded-lg p-3 text-xs" style={{ background: C.amberSoft, color: C.amber }}>
+              略過(已存在):{parseResult.skipped.map((s) => s.name).join("、")}
+            </div>
+          )}
+
+          {/* 預覽表格(前 30) */}
+          {parseResult.rows.length > 0 && (
+            <div className="rounded-lg overflow-auto text-xs" style={{ border: `1px solid ${C.line}`, maxHeight: 200 }}>
+              <table className="w-full" style={{ borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "#EAF0F6" }}>
+                    {["中文姓名","英文名","Email","聯絡","狀態"].map((h) => (
+                      <th key={h} className="px-2 py-1 text-left" style={{ color: C.muted }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {parseResult.rows.slice(0, 30).map((row, i) => (
+                    <tr key={i} style={{ borderTop: `1px solid ${C.line}` }}>
+                      <td className="px-2 py-1" style={{ color: C.text }}>{row.zh_name}</td>
+                      <td className="px-2 py-1" style={{ color: C.muted }}>{row.en_name || "—"}</td>
+                      <td className="px-2 py-1" style={{ color: C.muted }}>{row.zoom_email || "—"}</td>
+                      <td className="px-2 py-1" style={{ color: C.muted }}>{row.contact_info || "—"}</td>
+                      <td className="px-2 py-1" style={{ color: C.muted }}>{row.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2">
+            <Btn kind="ghost" size="sm" onClick={() => { setStep("select"); setParseResult(null); }}>
+              重新選檔
+            </Btn>
+            <Btn
+              kind="gold"
+              size="sm"
+              disabled={parseResult.rows.length === 0 || isPending}
+              onClick={handleImport}
+            >
+              {isPending ? "匯入中…" : `確認匯入 ${parseResult.rows.length} 位學生`}
+            </Btn>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-export default function StudentsClient({ students, teachers, accounts, lessons }: Props) {
+export default function StudentsClient({ students, teachers, accounts, lessons, enrollments }: Props) {
   const [modal, setModal] = useState<ModalState>({ kind: "none" });
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -464,72 +608,16 @@ export default function StudentsClient({ students, teachers, accounts, lessons }
         </div>
       )}
 
-      {/* Detail Modal */}
+      {/* #12 Detail Modal */}
       {modal.kind === "detail" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(10,30,54,0.55)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
-          <div className="w-full max-w-lg rounded-2xl p-5 md:p-6 space-y-4 overflow-y-auto"
-            style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)", maxHeight: "90vh" }}>
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="text-lg font-semibold" style={{ color: C.navy }}>{modal.student.zh_name}</h3>
-                {modal.student.en_name && (
-                  <div className="text-sm" style={{ color: C.muted }}>{modal.student.en_name}</div>
-                )}
-              </div>
-              <button onClick={closeModal} className="text-xl" style={{ color: C.muted }}>×</button>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              {[
-                ["Zoom", modal.student.zoom_email || "—"],
-                ["聯絡", modal.student.contact_info || "—"],
-                ["年齡", modal.student.age || "—"],
-                ["老師", teacherById[modal.student.current_teacher_id || ""]?.teacher_name || "—"],
-              ].map(([label, val]) => (
-                <div key={label} className="rounded-lg p-2.5" style={{ background: "#F7F5EF" }}>
-                  <div className="text-xs" style={{ color: C.muted }}>{label}</div>
-                  <div style={{ color: C.text }}>{val}</div>
-                </div>
-              ))}
-            </div>
-            <div>
-              <div className="text-xs font-semibold mb-2" style={{ color: C.muted }}>
-                課程帳戶({accounts.filter((a) => a.student_id === modal.student.id).length})
-              </div>
-              <div className="space-y-2">
-                {accounts.filter((a) => a.student_id === modal.student.id).map((a) => {
-                  const completed = lessons.filter(
-                    (l) => l.account_id === a.id && l.is_active && l.status === "completed"
-                  ).length;
-                  const remaining = a.total_lessons - completed;
-                  return (
-                    <div key={a.id} className="rounded-lg p-3 flex items-center justify-between gap-2"
-                      style={{ border: `1px solid ${C.line}`, opacity: a.status_override === "Closed" ? 0.6 : 1 }}>
-                      <div>
-                        <div className="text-sm font-medium" style={{ color: C.navy }}>{a.course_label}</div>
-                        <div className="text-xs mt-0.5" style={{ color: C.muted }}>
-                          已完 {completed} / 共 {a.total_lessons} 堂
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-lg font-bold"
-                          style={{ color: remaining > 0 ? C.navy : C.muted }}>{remaining}</div>
-                        <div className="text-xs" style={{ color: C.muted }}>剩餘</div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {accounts.filter((a) => a.student_id === modal.student.id).length === 0 && (
-                  <div className="text-sm" style={{ color: C.muted }}>尚無課程帳戶。</div>
-                )}
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <Btn kind="ghost" size="sm" onClick={closeModal}>關閉</Btn>
-            </div>
-          </div>
-        </div>
+        <DetailModal
+          student={modal.student}
+          teachers={teachers}
+          accounts={accounts as any}
+          lessons={lessons as any}
+          enrollments={enrollments}
+          onClose={closeModal}
+        />
       )}
 
       {/* CSV Modal */}
@@ -543,6 +631,7 @@ export default function StudentsClient({ students, teachers, accounts, lessons }
             <CsvImportPanel
               onDone={(msg) => { showToast(msg, msg.includes("成功")); closeModal(); }}
               onCancel={closeModal}
+              existingNames={new Set(students.map((s) => s.zh_name))}
             />
           </div>
         </div>

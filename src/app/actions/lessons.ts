@@ -231,3 +231,15 @@ export async function undoSubstitute(lessonId: string) {
   revalidatePath("/");
   return { ok: true };
 }
+
+// ── 更新課程備註 (#15) ────────────────────────────────────────────────────────
+export async function updateLessonNote(lessonId: string, note: string) {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("lessons")
+    .update({ note: note.trim() || null, updated_at: new Date().toISOString() })
+    .eq("id", lessonId);
+  if (error) return { error: error.message };
+  revalidatePath("/lessons");
+  return { ok: true };
+}

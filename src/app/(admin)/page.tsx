@@ -10,6 +10,7 @@ import type { Lesson, Student, Teacher, Account, RemittancePeriod, ScheduleRule 
 import HealthCheck from "./HealthCheck";
 import NextSteps from "./NextSteps";
 import DashboardActions from "./DashboardActions";
+import DashboardWidgets from "./DashboardWidgets";
 
 async function loadData() {
   const supabase = createClient();
@@ -216,6 +217,12 @@ export default async function DashboardPage() {
         studentById={studentById}
         teacherById={teacherById}
         today={today}
+      />
+
+      <DashboardWidgets
+        lessons={lessons}
+        accounts={accounts}
+        teachers={teachers}
       />
     </div>
   );

@@ -6,10 +6,40 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { C, TABS } from "@/lib/constants";
 
-export default function Sidebar() {
+interface SidebarProps {
+  lastBackupAt?: string | null;
+}
+
+export default function Sidebar({ lastBackupAt }: SidebarProps = {}) {
   const pathname = usePathname();
   const router = useRouter();
   const [navOpen, setNavOpen] = useState(false);
+
+  const getBackupLabel = () => {
+    if (!lastBackupAt) return "尚未備份";
+    const days = Math.floor((Date.now() - new Date(lastBackupAt).getTime()) / 86400000);
+    if (days === 0) return "今天";
+    if (days === 1) return "1 天前";
+    return `${days} 天前${days > 7 ? " ⚠" : ""}`;
+  };
+
+  const handleExportSnapshot = async () => {
+    try {
+      const res = await fetch("/api/export-snapshot", { method: "POST" });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "bridgeway-snapshot-" + new Date().toISOString().slice(0, 10) + ".json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      router.refresh();
+    } catch (e) {
+      console.error("Export failed", e);
+    }
+  };
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -113,6 +143,18 @@ export default function Sidebar() {
           className="px-5 py-4 space-y-2.5"
           style={{ borderTop: `1px solid ${C.navySoft}` }}
         >
+          <button
+            onClick={handleExportSnapshot}
+            className="w-full px-2 py-2 rounded text-xs transition-opacity hover:opacity-80 mb-2"
+            style={{ background: C.gold, color: "#fff", letterSpacing: "0.03em" }}
+          >
+            匯出 snapshot
+          </button>
+          {lastBackupAt !== undefined && (
+            <div className="text-xs mb-2" style={{ color: "#7A93B8" }}>
+              上次備份:{getBackupLabel()}
+            </div>
+          )}
           <button
             onClick={handleLogout}
             className="w-full px-2 py-2 rounded text-xs transition-opacity hover:opacity-80"

@@ -20,6 +20,7 @@ import {
   revertLessonToScheduled,
   cancelLessons,
   undoSubstitute,
+  updateLessonNote,
 } from "@/app/actions/lessons";
 
 type Tab = "today" | "week" | "overdue" | "all";
@@ -76,6 +77,8 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
   const [modal, setModal] = useState<ModalState>({ kind: "none" });
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [noteEdit, setNoteEdit] = useState("");
 
   const today = todayYMD();
   const wk = weekRange();
@@ -148,6 +151,53 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
   const clearSelect = () => setSelected(new Set());
 
   const selectedLessons = filtered.filter((l) => selected.has(l.id));
+
+  // ── 備註編輯 (#15) ───────────────────────────────────────────────────────────
+  const saveNote = (lessonId: string) => {
+    startTransition(async () => {
+      const res = await updateLessonNote(lessonId, noteEdit);
+      if (res.error) showToast(res.error, false);
+      else { showToast("備註已儲存"); setEditingNoteId(null); }
+    });
+  };
+
+  // ── CSV 匯出 (#16) ────────────────────────────────────────────────────────────
+  const handleExportCsv = () => {
+    const rows = filtered.map((l) => {
+      const stu = studentById[l.student_id];
+      const teacher = teacherById[l.teacher_id || ""];
+      const origTeacher = teacherById[l.original_teacher_id || ""];
+      return [
+        l.date,
+        l.time || "",
+        stu?.zh_name || "",
+        stu?.en_name || "",
+        teacher?.teacher_name || "",
+        l.is_substitute ? (origTeacher?.teacher_name || "") : "",
+        ({ general: "一般", makeup: "補課", extension: "延伸" } as Record<string,string>)[l.class_type] || l.class_type,
+        ({ scheduled: "待上", completed: "已完成", cancelled: "已取消" } as Record<string,string>)[l.status] || l.status,
+        l.duration,
+        l.payout_snapshot?.teacher_payout_ntd || 0,
+        l.payout_snapshot?.hanne_share_ntd || 0,
+        l.payout_snapshot?.lee_commission_ntd || 0,
+        l.note || "",
+      ];
+    });
+    const csv = "\uFEFF" + [
+      ["日期","時間","中文姓名","英文名","老師","原老師(代課時)","類型","狀態","時長","老師抽成 NTD","Hanne 抽成 NTD","Lee 淨收入 NTD","備註"],
+      ...rows,
+    ].map((row) => row.map((c) => {
+      const s = String(c ?? "");
+      return /[,"\n]/.test(s) ? '"' + s.replace(/"/g, '""')+'"' : s;
+    }).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "bridgeway-lessons-" + new Date().toISOString().slice(0,10) + ".csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // ── 動作 ──────────────────────────────────────────────────────────────────
   const handleComplete = (lessonId: string) => {
@@ -269,6 +319,13 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
           />
           顯示已取消
         </label>
+        <button
+          onClick={handleExportCsv}
+          className="text-xs px-3 py-2 rounded-lg"
+          style={{ border: `1px solid ${C.line}`, color: C.muted }}
+        >
+          ⬇ CSV 匯出
+        </button>
       </div>
 
       {/* 批次操作列 */}
@@ -306,7 +363,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
              "沒有符合條件的課程。"}
           </Empty>
         ) : (
-          <Table head={["", "日期", "時間", "學生", "老師", "類型", "狀態", "費用", "操作"]}>
+          <Table head={["", "日期", "時間", "學生", "老師", "類型", "狀態", "費用", "備註", "操作"]}>
             {filtered.map((l) => {
               const student = studentById[l.student_id];
               const teacher = teacherById[l.teacher_id || ""];
@@ -383,6 +440,41 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
                         <div>師 {money(snap.teacher_payout_ntd)}</div>
                         <div style={{ color: C.green }}>Lee {money(leeFee)}</div>
                       </div>
+                    )}
+                  </Td>
+                  <Td>
+                    {editingNoteId === l.id ? (
+                      <div className="flex gap-1 items-center">
+                        <input
+                          value={noteEdit}
+                          onChange={(e) => setNoteEdit(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveNote(l.id);
+                            if (e.key === "Escape") setEditingNoteId(null);
+                          }}
+                          className="px-2 py-1 text-xs rounded"
+                          style={{ border: `1px solid ${C.line}`, minWidth: 100 }}
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => saveNote(l.id)}
+                          className="text-xs px-1.5 py-1 rounded"
+                          style={{ background: C.green, color: "#fff" }}
+                        >✓</button>
+                        <button
+                          onClick={() => setEditingNoteId(null)}
+                          className="text-xs"
+                          style={{ color: C.muted }}
+                        >✕</button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setEditingNoteId(l.id); setNoteEdit(l.note || ""); }}
+                        className="text-xs text-left"
+                        style={{ color: l.note ? C.text : C.muted, minWidth: 60 }}
+                      >
+                        {l.note || "＋ 備註"}
+                      </button>
                     )}
                   </Td>
                   <Td>

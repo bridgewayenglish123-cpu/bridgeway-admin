@@ -406,6 +406,69 @@ function FlexLessonForm({
   );
 }
 
+
+// ── 展開列子元件(#14) ────────────────────────────────────────────────────────
+function ExpandedRow({
+  accId,
+  lessons,
+  teacherById,
+}: {
+  accId: string;
+  lessons: PartialLesson[];
+  teacherById: Record<string, PartialTeacher>;
+}) {
+  const accLessons = lessons
+    .filter((l) => l.account_id === accId && l.is_active)
+    .sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")));
+
+  return (
+    <tr style={{ borderBottom: `1px solid ${C.line}`, background: "#FAFBFC" }}>
+      <td colSpan={7} className="p-3">
+        <div className="text-xs font-semibold mb-2" style={{ color: C.muted }}>
+          課程明細({accLessons.length} 堂)
+        </div>
+        {accLessons.length === 0 ? (
+          <div className="text-sm py-2" style={{ color: C.muted }}>
+            此帳戶尚無課程紀錄。到「排課管理」設定規則,或點「排課」手動加。
+          </div>
+        ) : (
+          <Table head={["日期", "時間", "老師", "類型", "狀態"]}>
+            {accLessons.map((l) => (
+              <tr key={l.id} style={{ borderBottom: `1px solid ${C.line}` }}>
+                <Td><span className="text-xs">{l.date}</span></Td>
+                <Td><span className="text-xs" style={{ color: C.muted }}>{l.time || "—"}</span></Td>
+                <Td><span className="text-xs">{teacherById[l.teacher_id || ""]?.teacher_name || "—"}</span></Td>
+                <Td>
+                  <Badge
+                    tone={
+                      l.class_type === "makeup" ? "amber" :
+                      l.class_type === "extension" ? "navy" : "gray"
+                    }
+                  >
+                    {l.class_type === "makeup" ? "補課" :
+                     l.class_type === "extension" ? "延伸" : "一般"}
+                  </Badge>
+                </Td>
+                <Td>
+                  <Badge
+                    tone={
+                      l.status === "completed" ? "green" :
+                      l.status === "cancelled" ? "red" : "gray"
+                    }
+                  >
+                    {l.status === "completed" ? "已完成" :
+                     l.status === "cancelled" ? "已取消" : "待上"}
+                  </Badge>
+                </Td>
+              </tr>
+            ))}
+          </Table>
+        )}
+      </td>
+    </tr>
+  );
+}
+
 // ── 主元件 ────────────────────────────────────────────────────────────────────
 export default function AccountsClient({ accounts, students, teachers, lessons, priceRules }: Props) {
   const [modal, setModal] = useState<ModalState>({ kind: "none" });
@@ -413,7 +476,16 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
   const [isPending, startTransition] = useTransition();
   const [filterStudent, setFilterStudent] = useState("");
   const [filterTab, setFilterTab] = useState<"active" | "closed" | "all">("active");
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -422,6 +494,7 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
   const closeModal = () => setModal({ kind: "none" });
 
   const studentById = Object.fromEntries(students.map((s) => [s.id, s]));
+  const teacherById = useMemo(() => Object.fromEntries(teachers.map((t) => [t.id, t])), [teachers]);
 
   // #8 孤兒帳戶
   const orphanAccounts = useMemo(
@@ -570,7 +643,7 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
             {accounts.length === 0 ? "還沒有任何課程帳戶。點右上角開課。" : "沒有符合條件的帳戶。"}
           </Empty>
         ) : (
-          <Table head={["學生", "課程", "狀態", "進度", "剩餘", "操作"]}>
+          <Table head={["", "學生", "課程", "狀態", "進度", "剩餘", "操作"]}>
             {filtered.map((acc) => {
               const st = getStatus(acc);
               const student = studentById[acc.student_id];
@@ -581,7 +654,17 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
                 : 0;
 
               return (
-                <tr key={acc.id} style={{ borderBottom: `1px solid ${C.line}`, opacity: st === "Closed" ? 0.55 : 1 }}>
+                <>
+                <tr key={acc.id} style={{ borderBottom: expandedIds.has(acc.id) ? "none" : `1px solid ${C.line}`, opacity: st === "Closed" ? 0.55 : 1 }}>
+                  <Td>
+                    <button
+                      onClick={() => toggleExpand(acc.id)}
+                      className="text-xs w-5 h-5 flex items-center justify-center rounded"
+                      style={{ color: C.muted, background: "#EAF0F6" }}
+                    >
+                      {expandedIds.has(acc.id) ? "▼" : "▶"}
+                    </button>
+                  </Td>
                   <Td>
                     <div className="font-medium" style={{ color: C.navy }}>{student?.zh_name || "—"}</div>
                     {student?.en_name && <div className="text-xs" style={{ color: C.muted }}>{student.en_name}</div>}
@@ -638,6 +721,15 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
                     </div>
                   </Td>
                 </tr>
+                {expandedIds.has(acc.id) && (
+                  <ExpandedRow
+                    key={acc.id + "_exp"}
+                    accId={acc.id}
+                    lessons={lessons}
+                    teacherById={teacherById}
+                  />
+                )}
+              </>
               );
             })}
           </Table>
