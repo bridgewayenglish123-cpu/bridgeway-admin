@@ -1,16 +1,28 @@
-import Card from "@/components/ui/Card";
-import { C } from "@/lib/constants";
+import { createClient } from "@/lib/supabase/server";
+import type { PriceRule, Account } from "@/lib/supabase/types";
+import RulesClient from "./RulesClient";
 
-export default function StubPage() {
-  return (
-    <div className="space-y-4">
-      <h2 className="text-2xl md:text-3xl" style={{ color: C.navy, letterSpacing: "0.02em" }}>價格規則</h2>
-      <Card title="Coming Soon">
-        <div className="text-sm py-6 text-center" style={{ color: C.muted, lineHeight: 1.7 }}>
-          此頁面將在後續 session 移植過來。<br />
-          在此之前,你可以繼續用 MVP 版本進行日常操作。
-        </div>
-      </Card>
-    </div>
-  );
+async function loadData() {
+  const supabase = createClient();
+  const [rulesRes, accountsRes] = await Promise.all([
+    supabase.from("price_rules").select("*").order("teacher_type").order("duration_type").order("billing_type").order("lesson_count"),
+    supabase.from("accounts").select("id,price_rule_code: enrollment_id").select("id,student_id"),
+  ]);
+  // 計算每條規則被幾個帳戶使用(透過 enrollments)
+  const { data: enrollments } = await supabase.from("enrollments").select("price_rule_code");
+  const usageCounts: Record<string, number> = {};
+  for (const e of enrollments || []) {
+    if (e.price_rule_code) {
+      usageCounts[e.price_rule_code] = (usageCounts[e.price_rule_code] || 0) + 1;
+    }
+  }
+  return {
+    rules: (rulesRes.data || []) as PriceRule[],
+    usageCounts,
+  };
+}
+
+export default async function RulesPage() {
+  const data = await loadData();
+  return <RulesClient {...data} />;
 }
