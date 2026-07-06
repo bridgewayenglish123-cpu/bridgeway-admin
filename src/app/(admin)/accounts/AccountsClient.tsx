@@ -42,8 +42,7 @@ type ModalState =
   | { kind: "flex"; account: Account }
   | { kind: "confirm-close"; account: Account }
   | { kind: "confirm-reopen"; account: Account }
-  | { kind: "confirm-delete"; account: Account }
-  | { kind: "detail"; account: Account };
+  | { kind: "confirm-delete"; account: Account };
 
 function Toast({ msg, ok }: { msg: string; ok: boolean }) {
   return (
@@ -56,7 +55,6 @@ function Toast({ msg, ok }: { msg: string; ok: boolean }) {
   );
 }
 
-// ── 帳戶狀態計算 ─────────────────────────────────────────────────────────────
 function accountStatus(acc: Account, lessons: PartialLesson[]) {
   if (acc.status_override === "Closed") return "Closed";
   const completed = lessons.filter(
@@ -68,28 +66,16 @@ function accountStatus(acc: Account, lessons: PartialLesson[]) {
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  Active: "進行中",
-  Trial: "試聽中",
-  Closed: "已結束",
-  Completed: "已完課",
+  Active: "進行中", Trial: "試聽中", Closed: "已結束", Completed: "已完課",
 };
 const STATUS_TONE: Record<string, "green" | "gold" | "gray" | "navy"> = {
-  Active: "green",
-  Trial: "gold",
-  Closed: "gray",
-  Completed: "navy",
+  Active: "green", Trial: "gold", Closed: "gray", Completed: "navy",
 };
 
-// ── 開課表單 ─────────────────────────────────────────────────────────────────
+// ── 開課表單 ──────────────────────────────────────────────────────────────────
 function OpenAccountForm({
-  students,
-  teachers,
-  priceRules,
-  prefillStudentId,
-  onSave,
-  onCancel,
-  isPending,
-  isConvert,
+  students, teachers, priceRules, prefillStudentId,
+  onSave, onCancel, isPending, isConvert,
 }: {
   students: PartialStudent[];
   teachers: PartialTeacher[];
@@ -108,14 +94,8 @@ function OpenAccountForm({
   const [manualLessons, setManualLessons] = useState("");
 
   const activeStudents = students.filter((s) => s.status === "Active" || s.status === "Paused");
-  const activeTeachers = teachers.filter((t) => t.active_status === "Active");
-
   const selectedRule = priceRules.find((r) => r.price_rule_code === ruleCode);
-
-  const lessonCount = selectedRule
-    ? selectedRule.lesson_count
-    : parseInt(manualLessons) || 0;
-
+  const lessonCount = selectedRule ? selectedRule.lesson_count : parseInt(manualLessons) || 0;
   const canSave = studentId && (ruleCode || (courseLabel && lessonCount > 0));
 
   const handleSave = () => {
@@ -129,13 +109,7 @@ function OpenAccountForm({
           hanne_share_ntd: rule.hanne_share_ntd,
           lee_commission_ntd: rule.price_ntd - rule.teacher_payout_ntd - rule.hanne_share_ntd,
         }
-      : {
-          original_price_ntd: 0,
-          lesson_count: lessonCount,
-          teacher_payout_ntd: 0,
-          hanne_share_ntd: 0,
-          lee_commission_ntd: 0,
-        };
+      : { original_price_ntd: 0, lesson_count: lessonCount, teacher_payout_ntd: 0, hanne_share_ntd: 0, lee_commission_ntd: 0 };
 
     onSave({
       student_id: studentId,
@@ -175,11 +149,8 @@ function OpenAccountForm({
           </select>
         </div>
       )}
-
       <div>
-        <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
-          價格方案
-        </label>
+        <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>價格方案</label>
         <select
           className="w-full rounded-lg border px-3 py-2 text-sm"
           style={{ borderColor: C.line, color: C.text }}
@@ -198,25 +169,17 @@ function OpenAccountForm({
           ))}
         </select>
       </div>
-
       {selectedRule && (
         <div className="rounded-lg p-3 text-xs space-y-1" style={{ background: "#EAF0F6", color: C.navy }}>
-          <div className="flex justify-between">
-            <span>課程費用</span><span className="font-medium">NT$ {money(selectedRule.price_ntd)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>老師薪資</span><span>NT$ {money(selectedRule.teacher_payout_ntd)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Hanne 抽成</span><span>NT$ {money(selectedRule.hanne_share_ntd)}</span>
-          </div>
+          <div className="flex justify-between"><span>課程費用</span><span className="font-medium">NT$ {money(selectedRule.price_ntd)}</span></div>
+          <div className="flex justify-between"><span>老師薪資</span><span>NT$ {money(selectedRule.teacher_payout_ntd)}</span></div>
+          <div className="flex justify-between"><span>Hanne 抽成</span><span>NT$ {money(selectedRule.hanne_share_ntd)}</span></div>
           <div className="flex justify-between font-medium" style={{ color: C.green }}>
             <span>Lee 收入</span>
             <span>NT$ {money(selectedRule.price_ntd - selectedRule.teacher_payout_ntd - selectedRule.hanne_share_ntd)}</span>
           </div>
         </div>
       )}
-
       <div>
         <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
           課程標籤 <span style={{ color: C.red }}>*</span>
@@ -229,15 +192,13 @@ function OpenAccountForm({
           placeholder="e.g. 2024 春季 25分鐘 8堂"
         />
       </div>
-
       {!selectedRule && (
         <div>
           <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
             堂數 <span style={{ color: C.red }}>*</span>
           </label>
           <input
-            type="number"
-            min={1}
+            type="number" min={1}
             className="w-full rounded-lg border px-3 py-2 text-sm"
             style={{ borderColor: C.line, color: C.text }}
             value={manualLessons}
@@ -246,11 +207,8 @@ function OpenAccountForm({
           />
         </div>
       )}
-
       <div>
-        <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
-          收款日期
-        </label>
+        <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>收款日期</label>
         <input
           type="date"
           className="w-full rounded-lg border px-3 py-2 text-sm"
@@ -259,7 +217,6 @@ function OpenAccountForm({
           onChange={(e) => setPaymentDate(e.target.value)}
         />
       </div>
-
       <div>
         <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>備註</label>
         <input
@@ -269,15 +226,9 @@ function OpenAccountForm({
           onChange={(e) => setNote(e.target.value)}
         />
       </div>
-
       <div className="flex justify-end gap-2 pt-1">
         <Btn kind="ghost" size="sm" onClick={onCancel} disabled={isPending}>取消</Btn>
-        <Btn
-          kind="primary"
-          size="sm"
-          disabled={!canSave || isPending}
-          onClick={handleSave}
-        >
+        <Btn kind="primary" size="sm" disabled={!canSave || isPending} onClick={handleSave}>
           {isPending ? "開課中…" : isConvert ? "轉為正式課程" : "開課"}
         </Btn>
       </div>
@@ -285,51 +236,93 @@ function OpenAccountForm({
   );
 }
 
-// ── 彈性排課表單 ──────────────────────────────────────────────────────────────
+// ── 彈性排課表單(修正版) ──────────────────────────────────────────────────────
 function FlexLessonForm({
-  account,
-  teachers,
-  lessons,
-  onSave,
-  onCancel,
-  isPending,
+  account, teachers, lessons, onClose,
 }: {
   account: Account;
   teachers: PartialTeacher[];
   lessons: PartialLesson[];
-  onSave: (d: { teacher_id: string; date: string; time: string; duration: number }) => void;
-  onCancel: () => void;
-  isPending: boolean;
+  onClose: () => void;
 }) {
+  const defaultDuration = account.duration_type === "Long55" ? 55 : 25;
   const [teacherId, setTeacherId] = useState("");
   const [date, setDate] = useState(todayYMD());
-  const [time, setTime] = useState("10:00");
-  const [duration, setDuration] = useState(
-    account.duration_type === "Long55" ? 55 : 25
+  const [time, setTime] = useState("");
+  const [duration, setDuration] = useState(defaultDuration);
+  const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  // 老師過濾:Hanne 帳戶只列 Hanne;Other 帳戶只列 Other
+  const filteredTeachers = teachers.filter(
+    (t) =>
+      t.active_status === "Active" &&
+      (account.teacher_type === "Hanne"
+        ? t.teacher_type === "Hanne"
+        : t.teacher_type === "Other")
   );
 
   const completed = lessons.filter(
     (l) => l.account_id === account.id && l.is_active && l.status === "completed"
   ).length;
+  const generalScheduled = lessons.filter(
+    (l) => l.account_id === account.id && l.is_active && l.class_type === "general"
+  ).length;
   const remaining = account.total_lessons - completed;
-  const activeTeachers = teachers.filter((t) => t.active_status === "Active");
+
+  const canSubmit = teacherId && date && time && !isPending;
+
+  const doSave = (keepOpen: boolean) => {
+    startTransition(async () => {
+      const res = await bookFlexLesson({
+        account_id: account.id,
+        student_id: account.student_id,
+        teacher_id: teacherId,
+        date,
+        time,
+        duration,
+        total_lessons: account.total_lessons,
+        snapshot: account.snapshot,
+      });
+      if (!res.ok) {
+        setStatus({ ok: false, msg: res.error || "排課失敗" });
+      } else if (keepOpen) {
+        setStatus({ ok: true, msg: `已排:${date} ${time}` });
+        setTime("");
+      } else {
+        onClose();
+      }
+    });
+  };
 
   return (
     <div className="space-y-3">
+      {/* 帳戶摘要 */}
       <div className="rounded-lg p-3 text-sm" style={{ background: "#EAF0F6", color: C.navy }}>
-        <strong>{account.course_label}</strong> · 剩餘{" "}
-        <span style={{ color: remaining > 0 ? C.green : C.red }}>
-          {remaining}
-        </span>{" "}
-        / {account.total_lessons} 堂
+        <strong>{account.course_label}</strong>
+        <span className="ml-2" style={{ color: C.muted }}>
+          剩餘{" "}
+          <span style={{ color: remaining > 0 ? C.green : C.red, fontWeight: 600 }}>
+            {remaining}
+          </span>
+          {" "}/ {account.total_lessons} 堂
+        </span>
       </div>
 
-      {remaining <= 0 && (
-        <div className="rounded-lg p-3 text-sm" style={{ background: C.amberSoft, color: C.amber }}>
-          ⚠ 此帳戶堂數已用盡,彈性排課仍可新增但請確認是否正確。
+      {/* 狀態訊息(成功/失敗) */}
+      {status && (
+        <div
+          className="rounded-lg p-3 text-sm whitespace-pre-line"
+          style={{
+            background: status.ok ? C.greenSoft : C.redSoft,
+            color: status.ok ? C.green : C.red,
+          }}
+        >
+          {status.ok ? "✅ " : "⚠ "}{status.msg}
         </div>
       )}
 
+      {/* 老師 */}
       <div>
         <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>老師</label>
         <select
@@ -339,12 +332,18 @@ function FlexLessonForm({
           onChange={(e) => setTeacherId(e.target.value)}
         >
           <option value="">— 選擇老師 —</option>
-          {activeTeachers.map((t) => (
+          {filteredTeachers.map((t) => (
             <option key={t.id} value={t.id}>{t.teacher_name}</option>
           ))}
         </select>
+        {filteredTeachers.length === 0 && (
+          <div className="text-xs mt-1" style={{ color: C.amber }}>
+            此帳戶類型({account.teacher_type})目前沒有啟用中的老師。
+          </div>
+        )}
       </div>
 
+      {/* 日期 + 時間 */}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>日期</label>
@@ -353,7 +352,7 @@ function FlexLessonForm({
             className="w-full rounded-lg border px-3 py-2 text-sm"
             style={{ borderColor: C.line, color: C.text }}
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(e) => { setDate(e.target.value); setStatus(null); }}
           />
         </div>
         <div>
@@ -363,14 +362,15 @@ function FlexLessonForm({
             className="w-full rounded-lg border px-3 py-2 text-sm"
             style={{ borderColor: C.line, color: C.text }}
             value={time}
-            onChange={(e) => setTime(e.target.value)}
+            onChange={(e) => { setTime(e.target.value); setStatus(null); }}
           />
         </div>
       </div>
 
+      {/* 時長 */}
       <div>
-        <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>時長(分鐘)</label>
-        <div className="flex gap-2">
+        <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>時長</label>
+        <div className="flex gap-4">
           {[25, 55].map((d) => (
             <label key={d} className="flex items-center gap-1.5 text-sm cursor-pointer" style={{ color: C.text }}>
               <input type="radio" checked={duration === d} onChange={() => setDuration(d)} />
@@ -380,15 +380,26 @@ function FlexLessonForm({
         </div>
       </div>
 
+      {/* 三顆按鈕 */}
       <div className="flex justify-end gap-2 pt-1">
-        <Btn kind="ghost" size="sm" onClick={onCancel} disabled={isPending}>取消</Btn>
+        <Btn kind="ghost" size="sm" onClick={onClose} disabled={isPending}>
+          關閉
+        </Btn>
         <Btn
-          kind="primary"
+          kind="ghost"
           size="sm"
-          disabled={!teacherId || !date || isPending}
-          onClick={() => onSave({ teacher_id: teacherId, date, time, duration })}
+          disabled={!canSubmit}
+          onClick={() => doSave(true)}
         >
-          {isPending ? "排課中…" : "新增這堂課"}
+          {isPending ? "儲存中…" : "儲存並再排一堂"}
+        </Btn>
+        <Btn
+          kind="gold"
+          size="sm"
+          disabled={!canSubmit}
+          onClick={() => doSave(false)}
+        >
+          {isPending ? "儲存中…" : "儲存並關閉"}
         </Btn>
       </div>
     </div>
@@ -396,13 +407,7 @@ function FlexLessonForm({
 }
 
 // ── 主元件 ────────────────────────────────────────────────────────────────────
-export default function AccountsClient({
-  accounts,
-  students,
-  teachers,
-  lessons,
-  priceRules,
-}: Props) {
+export default function AccountsClient({ accounts, students, teachers, lessons, priceRules }: Props) {
   const [modal, setModal] = useState<ModalState>({ kind: "none" });
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -416,23 +421,18 @@ export default function AccountsClient({
   const closeModal = () => setModal({ kind: "none" });
 
   const studentById = Object.fromEntries(students.map((s) => [s.id, s]));
-  const teacherById = Object.fromEntries(teachers.map((t) => [t.id, t]));
 
   const getCompleted = (accId: string) =>
     lessons.filter((l) => l.account_id === accId && l.is_active && l.status === "completed").length;
-
   const getRemaining = (acc: Account) => acc.total_lessons - getCompleted(acc.id);
-
   const getStatus = (acc: Account) => accountStatus(acc, lessons);
 
-  // 篩選
   const filtered = accounts.filter((a) => {
     const matchSt = !filterStudent || a.student_id === filterStudent;
     const matchStatus = !filterStatus || getStatus(a) === filterStatus;
     return matchSt && matchStatus;
   });
 
-  // 開課
   const handleOpenAccount = (input: OpenAccountInput) => {
     startTransition(async () => {
       const res = await openAccount(input);
@@ -441,7 +441,6 @@ export default function AccountsClient({
     });
   };
 
-  // 試聽轉正
   const handleConvert = (acc: Account, input: OpenAccountInput) => {
     startTransition(async () => {
       const res = await convertTrialToFull(acc.id, input);
@@ -450,7 +449,6 @@ export default function AccountsClient({
     });
   };
 
-  // 關閉 / 重啟
   const handleClose = (acc: Account) => {
     startTransition(async () => {
       const res = await closeAccount(acc.id);
@@ -458,6 +456,7 @@ export default function AccountsClient({
       else { showToast(`${acc.course_label} 已結束`); closeModal(); }
     });
   };
+
   const handleReopen = (acc: Account) => {
     startTransition(async () => {
       const res = await reopenAccount(acc.id);
@@ -466,32 +465,11 @@ export default function AccountsClient({
     });
   };
 
-  // 刪除
   const handleDelete = (acc: Account) => {
     startTransition(async () => {
       const res = await deleteAccount(acc.id);
       if (res.error) showToast(res.error, false);
       else { showToast(`${acc.course_label} 已刪除`); closeModal(); }
-    });
-  };
-
-  // 彈性排課
-  const handleFlex = (
-    acc: Account,
-    d: { teacher_id: string; date: string; time: string; duration: number }
-  ) => {
-    startTransition(async () => {
-      const res = await bookFlexLesson({
-        account_id: acc.id,
-        student_id: acc.student_id,
-        teacher_id: d.teacher_id,
-        date: d.date,
-        time: d.time,
-        duration: d.duration,
-        snapshot: acc.snapshot,
-      });
-      if (res.error) showToast(res.error, false);
-      else { showToast("已新增彈性排課"); closeModal(); }
     });
   };
 
@@ -504,21 +482,19 @@ export default function AccountsClient({
         </div>
         <div className="flex items-end justify-between flex-wrap gap-3">
           <h2 className="text-2xl md:text-3xl" style={{ color: C.navy }}>學員課程</h2>
-          <Btn kind="gold" size="md" onClick={() => setModal({ kind: "open" })}>
-            + 開新課程
-          </Btn>
+          <Btn kind="gold" size="md" onClick={() => setModal({ kind: "open" })}>+ 開新課程</Btn>
         </div>
       </div>
 
       <PageIntro storageKey="accounts" title="學員課程 · 說明">
         <p>管理每位學生的課程帳戶(開課紀錄)。</p>
-        <p>• <strong>開課</strong>:選擇學生 + 價格方案,系統自動帶入 snapshot 金額。也可手動輸入堂數。</p>
-        <p>• <strong>試聽轉正</strong>:點「轉為正式」,舊試聽帳戶自動關閉,開立新正式帳戶。</p>
-        <p>• <strong>彈性排課</strong>:直接為該帳戶排定一堂課(不建立固定規則)。</p>
-        <p>• <strong>刪除</strong>:會一併刪除所有關聯課程紀錄和排課規則,謹慎操作。</p>
+        <p>• <strong>開課</strong>:選擇學生 + 價格方案,系統自動帶入 snapshot 金額。</p>
+        <p>• <strong>試聽轉正</strong>:點「轉正式」,舊試聽帳戶自動關閉,開立新正式帳戶。</p>
+        <p>• <strong>彈性排課</strong>:直接排定一堂課,「儲存並再排一堂」可連排不關 Modal。</p>
+        <p>• <strong>刪除</strong>:會一併刪除所有關聯課程紀錄與排課規則,謹慎操作。</p>
       </PageIntro>
 
-      {/* 篩選列 */}
+      {/* 篩選 */}
       <div className="flex flex-wrap gap-2">
         <select
           className="rounded-lg border px-3 py-2 text-sm"
@@ -545,7 +521,7 @@ export default function AccountsClient({
         </select>
       </div>
 
-      {/* 帳戶列表 */}
+      {/* 列表 */}
       <Card title={`課程帳戶(${filtered.length}${filtered.length !== accounts.length ? ` / ${accounts.length}` : ""})`}>
         {filtered.length === 0 ? (
           <Empty action={<Btn kind="gold" onClick={() => setModal({ kind: "open" })}>+ 開新課程</Btn>}>
@@ -565,12 +541,8 @@ export default function AccountsClient({
               return (
                 <tr key={acc.id} style={{ borderBottom: `1px solid ${C.line}`, opacity: st === "Closed" ? 0.55 : 1 }}>
                   <Td>
-                    <div className="font-medium" style={{ color: C.navy }}>
-                      {student?.zh_name || "—"}
-                    </div>
-                    {student?.en_name && (
-                      <div className="text-xs" style={{ color: C.muted }}>{student.en_name}</div>
-                    )}
+                    <div className="font-medium" style={{ color: C.navy }}>{student?.zh_name || "—"}</div>
+                    {student?.en_name && <div className="text-xs" style={{ color: C.muted }}>{student.en_name}</div>}
                   </Td>
                   <Td>
                     <div className="text-sm" style={{ color: C.text }}>{acc.course_label}</div>
@@ -580,75 +552,45 @@ export default function AccountsClient({
                     </div>
                   </Td>
                   <Td>
-                    <Badge tone={STATUS_TONE[st] || "gray"}>
-                      {STATUS_LABEL[st] || st}
-                    </Badge>
+                    <Badge tone={STATUS_TONE[st] || "gray"}>{STATUS_LABEL[st] || st}</Badge>
                   </Td>
                   <Td>
-                    <div className="text-xs mb-1" style={{ color: C.muted }}>
-                      {completed}/{acc.total_lessons} 堂
-                    </div>
+                    <div className="text-xs mb-1" style={{ color: C.muted }}>{completed}/{acc.total_lessons} 堂</div>
                     <div className="w-20 h-1.5 rounded-full overflow-hidden" style={{ background: C.line }}>
                       <div
                         className="h-full rounded-full"
-                        style={{
-                          width: `${pct}%`,
-                          background: st === "Completed" ? C.green : C.gold,
-                        }}
+                        style={{ width: `${pct}%`, background: st === "Completed" ? C.green : C.gold }}
                       />
                     </div>
                   </Td>
                   <Td>
-                    <span
-                      className="text-sm font-medium"
-                      style={{ color: remaining > 0 ? C.navy : C.muted }}
-                    >
+                    <span className="text-sm font-medium" style={{ color: remaining > 0 ? C.navy : C.muted }}>
                       {remaining > 0 ? `${remaining} 堂` : "—"}
                     </span>
                   </Td>
                   <Td>
                     <div className="flex gap-1 flex-wrap">
                       {st === "Trial" && (
-                        <Btn
-                          kind="gold"
-                          size="sm"
-                          onClick={() => setModal({ kind: "convert", account: acc })}
-                        >
+                        <Btn kind="gold" size="sm" onClick={() => setModal({ kind: "convert", account: acc })}>
                           轉正式
                         </Btn>
                       )}
                       {(st === "Active" || st === "Trial") && (
-                        <Btn
-                          kind="ghost"
-                          size="sm"
-                          onClick={() => setModal({ kind: "flex", account: acc })}
-                        >
+                        <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "flex", account: acc })}>
                           排課
                         </Btn>
                       )}
                       {st === "Active" && (
-                        <Btn
-                          kind="ghost"
-                          size="sm"
-                          onClick={() => setModal({ kind: "confirm-close", account: acc })}
-                        >
+                        <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "confirm-close", account: acc })}>
                           結束
                         </Btn>
                       )}
                       {st === "Closed" && (
-                        <Btn
-                          kind="ghost"
-                          size="sm"
-                          onClick={() => setModal({ kind: "confirm-reopen", account: acc })}
-                        >
+                        <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "confirm-reopen", account: acc })}>
                           重啟
                         </Btn>
                       )}
-                      <Btn
-                        kind="danger"
-                        size="sm"
-                        onClick={() => setModal({ kind: "confirm-delete", account: acc })}
-                      >
+                      <Btn kind="danger" size="sm" onClick={() => setModal({ kind: "confirm-delete", account: acc })}>
                         刪除
                       </Btn>
                     </div>
@@ -672,17 +614,13 @@ export default function AccountsClient({
             style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)", maxHeight: "92vh" }}
           >
             <h3 className="text-base font-semibold" style={{ color: C.navy }}>
-              {modal.kind === "convert"
-                ? `試聽轉正式 · ${modal.account.course_label}`
-                : "開新課程"}
+              {modal.kind === "convert" ? `試聽轉正式 · ${modal.account.course_label}` : "開新課程"}
             </h3>
             <OpenAccountForm
               students={students}
               teachers={teachers}
               priceRules={priceRules}
-              prefillStudentId={
-                modal.kind === "convert" ? modal.account.student_id : modal.prefillStudentId
-              }
+              prefillStudentId={modal.kind === "convert" ? modal.account.student_id : modal.prefillStudentId}
               onSave={(input) => {
                 if (modal.kind === "convert") handleConvert(modal.account, input);
                 else handleOpenAccount(input);
@@ -710,9 +648,7 @@ export default function AccountsClient({
               account={modal.account}
               teachers={teachers}
               lessons={lessons}
-              onSave={(d) => handleFlex(modal.account, d)}
-              onCancel={closeModal}
-              isPending={isPending}
+              onClose={closeModal}
             />
           </div>
         </div>
@@ -724,16 +660,10 @@ export default function AccountsClient({
           style={{ background: "rgba(10,30,54,0.55)" }}
           onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
         >
-          <div
-            className="w-full max-w-sm rounded-2xl p-5 space-y-4"
-            style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}
-          >
-            <h3 className="text-base font-semibold" style={{ color: C.navy }}>
-              結束課程帳戶？
-            </h3>
+          <div className="w-full max-w-sm rounded-2xl p-5 space-y-4" style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}>
+            <h3 className="text-base font-semibold" style={{ color: C.navy }}>結束課程帳戶？</h3>
             <p className="text-sm" style={{ color: C.text }}>
               「{modal.account.course_label}」將標記為已結束,未來可重新啟用。
-              歷史課程紀錄不受影響。
             </p>
             {getRemaining(modal.account) > 0 && (
               <div className="rounded-lg p-3 text-sm" style={{ background: C.amberSoft, color: C.amber }}>
@@ -756,14 +686,9 @@ export default function AccountsClient({
           style={{ background: "rgba(10,30,54,0.55)" }}
           onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
         >
-          <div
-            className="w-full max-w-sm rounded-2xl p-5 space-y-4"
-            style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}
-          >
+          <div className="w-full max-w-sm rounded-2xl p-5 space-y-4" style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}>
             <h3 className="text-base font-semibold" style={{ color: C.navy }}>重新啟用帳戶？</h3>
-            <p className="text-sm" style={{ color: C.text }}>
-              「{modal.account.course_label}」將重新標記為進行中。
-            </p>
+            <p className="text-sm" style={{ color: C.text }}>「{modal.account.course_label}」將重新標記為進行中。</p>
             <div className="flex justify-end gap-2">
               <Btn kind="ghost" size="sm" onClick={closeModal}>取消</Btn>
               <Btn kind="good" size="sm" disabled={isPending} onClick={() => handleReopen(modal.account)}>
@@ -780,13 +705,8 @@ export default function AccountsClient({
           style={{ background: "rgba(10,30,54,0.55)" }}
           onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
         >
-          <div
-            className="w-full max-w-sm rounded-2xl p-5 space-y-4"
-            style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}
-          >
-            <h3 className="text-base font-semibold" style={{ color: C.red }}>
-              永久刪除課程帳戶？
-            </h3>
+          <div className="w-full max-w-sm rounded-2xl p-5 space-y-4" style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}>
+            <h3 className="text-base font-semibold" style={{ color: C.red }}>永久刪除課程帳戶？</h3>
             <div className="rounded-lg p-3 text-sm" style={{ background: C.redSoft, color: C.red }}>
               ⛔ 此操作將刪除「{modal.account.course_label}」及所有關聯課程紀錄與排課規則,無法復原。
             </div>

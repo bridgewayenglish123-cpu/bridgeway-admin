@@ -33,7 +33,6 @@ export async function openAccount(input: OpenAccountInput) {
   const supabase = createClient();
   const now = new Date().toISOString();
 
-  // 1. 建立 enrollment
   const enrollmentId = uid("en");
   const { error: enErr } = await supabase.from("enrollments").insert({
     id: enrollmentId,
@@ -47,7 +46,6 @@ export async function openAccount(input: OpenAccountInput) {
   });
   if (enErr) return { error: enErr.message };
 
-  // 2. 建立 account
   const accountId = uid("ac");
   const { error: acErr } = await supabase.from("accounts").insert({
     id: accountId,
@@ -68,7 +66,6 @@ export async function openAccount(input: OpenAccountInput) {
     updated_at: now,
   });
   if (acErr) {
-    // rollback enrollment
     await supabase.from("enrollments").delete().eq("id", enrollmentId);
     return { error: acErr.message };
   }
@@ -77,18 +74,13 @@ export async function openAccount(input: OpenAccountInput) {
   return { ok: true, accountId };
 }
 
-export async function convertTrialToFull(
-  accountId: string,
-  input: OpenAccountInput
-) {
-  // 試聽轉正:關閉舊試聽帳戶 + 開新正式帳戶
+export async function convertTrialToFull(accountId: string, input: OpenAccountInput) {
   const supabase = createClient();
   const { error: closeErr } = await supabase
     .from("accounts")
     .update({ status_override: "Closed", updated_at: new Date().toISOString() })
     .eq("id", accountId);
   if (closeErr) return { error: closeErr.message };
-
   return openAccount({ ...input, is_trial: false });
 }
 
@@ -116,23 +108,15 @@ export async function reopenAccount(accountId: string) {
 
 export async function deleteAccount(accountId: string) {
   const supabase = createClient();
-
-  // 取得 account
   const { data: acc } = await supabase
     .from("accounts").select("enrollment_id").eq("id", accountId).single();
-
-  // 刪課程
   await supabase.from("lessons").delete().eq("account_id", accountId);
-  // 刪排課規則
   await supabase.from("schedule_rules").delete().eq("account_id", accountId);
-  // 刪帳戶
   const { error } = await supabase.from("accounts").delete().eq("id", accountId);
   if (error) return { error: error.message };
-  // 刪 enrollment
   if (acc?.enrollment_id) {
     await supabase.from("enrollments").delete().eq("id", acc.enrollment_id);
   }
-
   revalidatePath("/accounts");
   return { ok: true };
 }
@@ -144,6 +128,7 @@ export async function bookFlexLesson(data: {
   date: string;
   time: string;
   duration: number;
+  total_lessons: number;
   snapshot: {
     original_price_ntd: number;
     lesson_count: number;
@@ -153,6 +138,32 @@ export async function bookFlexLesson(data: {
   };
 }) {
   const supabase = createClient();
+
+  // 1. 查現有課程
+  const { data: existing } = await supabase
+    .from("lessons")
+    .select("id,date,time,class_type,is_active")
+    .eq("account_id", data.account_id);
+
+  const active = (existing || []).filter((l) => l.is_active);
+
+  // 2. 重複時間檢查
+  const dup = active.find((l) => l.date === data.date && l.time === data.time);
+  if (dup) {
+    return { ok: false, error: "同日同時已有該帳戶的課程,請選其他時間。" };
+  }
+
+  // 3. 堂數上限檢查
+  const generalCount = active.filter((l) => l.class_type === "general").length;
+  if (generalCount >= data.total_lessons) {
+    return {
+      ok: false,
+      error: `此帳戶已排滿 ${generalCount}/${data.total_lessons} 堂。
+若想換時間,建議到「課程管理」取消某堂 → 選「加補課」會更順(自動處理堂數守恆)。`,
+    };
+  }
+
+  // 4. 建立課程
   const now = new Date().toISOString();
   const { error } = await supabase.from("lessons").insert({
     id: uid("ls"),
@@ -177,7 +188,8 @@ export async function bookFlexLesson(data: {
     created_at: now,
     updated_at: now,
   });
-  if (error) return { error: error.message };
+  if (error) return { ok: false, error: error.message };
+
   revalidatePath("/accounts");
   return { ok: true };
 }
