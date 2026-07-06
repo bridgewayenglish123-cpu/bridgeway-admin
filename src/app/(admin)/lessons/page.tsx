@@ -1,16 +1,26 @@
-import Card from "@/components/ui/Card";
-import { C } from "@/lib/constants";
+import { createClient } from "@/lib/supabase/server";
+import type { Lesson, Student, Teacher, Account, PriceRule } from "@/lib/supabase/types";
+import LessonsClient from "./LessonsClient";
 
-export default function StubPage() {
-  return (
-    <div className="space-y-4">
-      <h2 className="text-2xl md:text-3xl" style={{ color: C.navy, letterSpacing: "0.02em" }}>課程管理</h2>
-      <Card title="Coming Soon">
-        <div className="text-sm py-6 text-center" style={{ color: C.muted, lineHeight: 1.7 }}>
-          此頁面將在後續 session 移植過來。<br />
-          在此之前,你可以繼續用 MVP 版本進行日常操作。
-        </div>
-      </Card>
-    </div>
-  );
+async function loadData() {
+  const supabase = createClient();
+  const [lessonsRes, studentsRes, teachersRes, accountsRes, rulesRes] = await Promise.all([
+    supabase.from("lessons").select("*").order("date", { ascending: false }).order("time"),
+    supabase.from("students").select("id,zh_name,en_name"),
+    supabase.from("teachers").select("id,teacher_name,teacher_type,active_status"),
+    supabase.from("accounts").select("id,student_id,course_label,teacher_type,course_family,duration_type,billing_type,snapshot"),
+    supabase.from("price_rules").select("*").eq("active_status", "Active"),
+  ]);
+  return {
+    lessons: (lessonsRes.data || []) as Lesson[],
+    students: (studentsRes.data || []) as Pick<Student, "id" | "zh_name" | "en_name">[],
+    teachers: (teachersRes.data || []) as Pick<Teacher, "id" | "teacher_name" | "teacher_type" | "active_status">[],
+    accounts: (accountsRes.data || []) as Pick<Account, "id" | "student_id" | "course_label" | "teacher_type" | "course_family" | "duration_type" | "billing_type" | "snapshot">[],
+    priceRules: (rulesRes.data || []) as PriceRule[],
+  };
+}
+
+export default async function LessonsPage() {
+  const data = await loadData();
+  return <LessonsClient {...data} />;
 }
