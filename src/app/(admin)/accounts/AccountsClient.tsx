@@ -13,6 +13,7 @@ import Badge from "@/components/ui/Badge";
 import { Table, Td } from "@/components/ui/Table";
 import Empty from "@/components/ui/Empty";
 import { money, todayYMD } from "@/lib/utils";
+import { useConfirm } from "@/components/ConfirmProvider";
 import {
   openAccount,
   convertTrialToFull,
@@ -38,10 +39,7 @@ interface Props {
 type ModalState =
   | { kind: "none" }
   | { kind: "open"; prefillStudentId?: string }
-  | { kind: "flex"; account: Account }
-  | { kind: "confirm-close"; account: Account }
-  | { kind: "confirm-reopen"; account: Account }
-  | { kind: "confirm-delete"; account: Account };
+  | { kind: "flex"; account: Account };
 
 function Toast({ msg, ok }: { msg: string; ok: boolean }) {
   return (
@@ -494,6 +492,8 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
     setToast({ msg, ok });
     setTimeout(() => setToast(null), 3500);
   };
+  const { askConfirm } = useConfirm();
+
   const closeModal = () => setModal({ kind: "none" });
 
   // #D1 試聽轉正:找建議方案並預填開課 Modal
@@ -576,26 +576,62 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
   };
 
   const handleClose = (acc: Account) => {
-    startTransition(async () => {
-      const res = await closeAccount(acc.id);
-      if (res.error) showToast(res.error, false);
-      else { showToast(`${acc.course_label} 已結束`); closeModal(); }
+    const student = studentById[acc.student_id];
+    const remaining = getRemaining(acc);
+    const upcoming = lessons.filter((l) => l.account_id === acc.id && l.is_active && l.status === "scheduled").length;
+    askConfirm({
+      title: "結束帳戶",
+      message: `即將結束「${student?.zh_name || "?"} - ${acc.course_label}」帳戶。
+
+目前剩餘 ${remaining} 堂 / ${upcoming} 堂待上課程。
+
+結束後帳戶會歸類到「已結束」tab,已排定的課程不會自動取消(需另外處理),排課規則需另外停用。`,
+      confirmLabel: "確認結束",
+      onConfirm: async () => {
+        const res = await closeAccount(acc.id);
+        if (res.error) showToast(res.error, false);
+        else { showToast(`${acc.course_label} 已結束`); closeModal(); }
+      },
     });
   };
 
   const handleReopen = (acc: Account) => {
-    startTransition(async () => {
-      const res = await reopenAccount(acc.id);
-      if (res.error) showToast(res.error, false);
-      else { showToast(`${acc.course_label} 已重新啟用`); closeModal(); }
+    const student = studentById[acc.student_id];
+    askConfirm({
+      title: "重啟帳戶",
+      message: `即將重啟「${student?.zh_name || "?"} - ${acc.course_label}」帳戶。
+
+帳戶會回到「進行中」tab,可以繼續排課和上課。`,
+      confirmLabel: "確認重啟",
+      onConfirm: async () => {
+        const res = await reopenAccount(acc.id);
+        if (res.error) showToast(res.error, false);
+        else { showToast(`${acc.course_label} 已重新啟用`); closeModal(); }
+      },
     });
   };
 
   const handleDelete = (acc: Account) => {
-    startTransition(async () => {
-      const res = await deleteAccount(acc.id);
-      if (res.error) showToast(res.error, false);
-      else { showToast(`${acc.course_label} 已刪除`); closeModal(); }
+    const student = studentById[acc.student_id];
+    const accLessons = lessons.filter((l) => l.account_id === acc.id && l.is_active);
+    const completedCount = accLessons.filter((l) => l.status === "completed").length;
+    const ruleCount = 0; // schedule_rules 在 accounts 頁沒有載入,顯示 0 或不顯示
+    askConfirm({
+      title: "刪除帳戶(連鎖刪除)",
+      message: `即將刪除「${student?.zh_name || "?"} - ${acc.course_label}」帳戶。
+
+連帶會刪除:
+· ${accLessons.length} 堂課程紀錄(含 ${completedCount} 堂已完成)
+· 對應的開課紀錄(enrollment)
+
+此動作不可復原,且會影響匯款統計。`,
+      confirmLabel: "確認完全刪除",
+      danger: true,
+      onConfirm: async () => {
+        const res = await deleteAccount(acc.id);
+        if (res.error) showToast(res.error, false);
+        else { showToast(`${acc.course_label} 已刪除`); closeModal(); }
+      },
     });
   };
 
@@ -729,16 +765,16 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
                         </Btn>
                       )}
                       {st === "Active" && (
-                        <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "confirm-close", account: acc })}>
+                        <Btn kind="ghost" size="sm" onClick={() => handleClose(acc)}>
                           結束
                         </Btn>
                       )}
                       {st === "Closed" && (
-                        <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "confirm-reopen", account: acc })}>
+                        <Btn kind="ghost" size="sm" onClick={() => handleReopen(acc)}>
                           重啟
                         </Btn>
                       )}
-                      <Btn kind="danger" size="sm" onClick={() => setModal({ kind: "confirm-delete", account: acc })}>
+                      <Btn kind="danger" size="sm" onClick={() => handleDelete(acc)}>
                         刪除
                       </Btn>
                     </div>
@@ -811,73 +847,6 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
           </div>
         </div>
       )}
-
-      {modal.kind === "confirm-close" && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(10,30,54,0.55)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
-        >
-          <div className="w-full max-w-sm rounded-2xl p-5 space-y-4" style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}>
-            <h3 className="text-base font-semibold" style={{ color: C.navy }}>結束課程帳戶？</h3>
-            <p className="text-sm" style={{ color: C.text }}>
-              「{modal.account.course_label}」將標記為已結束,未來可重新啟用。
-            </p>
-            {getRemaining(modal.account) > 0 && (
-              <div className="rounded-lg p-3 text-sm" style={{ background: C.amberSoft, color: C.amber }}>
-                ⚠ 此帳戶還有 <strong>{getRemaining(modal.account)}</strong> 堂未完成。
-              </div>
-            )}
-            <div className="flex justify-end gap-2">
-              <Btn kind="ghost" size="sm" onClick={closeModal}>取消</Btn>
-              <Btn kind="danger" size="sm" disabled={isPending} onClick={() => handleClose(modal.account)}>
-                {isPending ? "處理中…" : "確認結束"}
-              </Btn>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {modal.kind === "confirm-reopen" && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(10,30,54,0.55)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
-        >
-          <div className="w-full max-w-sm rounded-2xl p-5 space-y-4" style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}>
-            <h3 className="text-base font-semibold" style={{ color: C.navy }}>重新啟用帳戶？</h3>
-            <p className="text-sm" style={{ color: C.text }}>「{modal.account.course_label}」將重新標記為進行中。</p>
-            <div className="flex justify-end gap-2">
-              <Btn kind="ghost" size="sm" onClick={closeModal}>取消</Btn>
-              <Btn kind="good" size="sm" disabled={isPending} onClick={() => handleReopen(modal.account)}>
-                {isPending ? "處理中…" : "確認重啟"}
-              </Btn>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {modal.kind === "confirm-delete" && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(10,30,54,0.55)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
-        >
-          <div className="w-full max-w-sm rounded-2xl p-5 space-y-4" style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}>
-            <h3 className="text-base font-semibold" style={{ color: C.red }}>永久刪除課程帳戶？</h3>
-            <div className="rounded-lg p-3 text-sm" style={{ background: C.redSoft, color: C.red }}>
-              ⛔ 此操作將刪除「{modal.account.course_label}」及所有關聯課程紀錄與排課規則,無法復原。
-            </div>
-            <div className="flex justify-end gap-2">
-              <Btn kind="ghost" size="sm" onClick={closeModal}>取消</Btn>
-              <Btn kind="danger" size="sm" disabled={isPending} onClick={() => handleDelete(modal.account)}>
-                {isPending ? "刪除中…" : "永久刪除"}
-              </Btn>
-            </div>
-          </div>
-        </div>
-      )}
-
       {toast && <Toast msg={toast.msg} ok={toast.ok} />}
     </div>
   );

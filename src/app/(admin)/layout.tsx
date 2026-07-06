@@ -1,4 +1,5 @@
 import Sidebar from "@/components/Sidebar";
+import ConfirmProvider from "@/components/ConfirmProvider";
 import { createClient } from "@/lib/supabase/server";
 import { C } from "@/lib/constants";
 

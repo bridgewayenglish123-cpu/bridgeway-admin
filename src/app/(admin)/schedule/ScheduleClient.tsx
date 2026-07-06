@@ -10,6 +10,7 @@ import Badge from "@/components/ui/Badge";
 import { Table, Td } from "@/components/ui/Table";
 import Empty from "@/components/ui/Empty";
 import RuleModal from "./RuleModal";
+import { useConfirm } from "@/components/ConfirmProvider";
 import {
   toggleScheduleRule,
   deleteScheduleRule,
@@ -33,11 +34,7 @@ interface Props {
 type ModalState =
   | { kind: "none" }
   | { kind: "add" }
-  | { kind: "edit"; rule: ScheduleRule }
-  | { kind: "confirm-generate-all" }
-  | { kind: "confirm-toggle"; rule: ScheduleRule }
-  | { kind: "confirm-delete"; rule: ScheduleRule }
-  | { kind: "confirm-clean-orphans"; count: number };
+  | { kind: "edit"; rule: ScheduleRule };
 
 function Toast({ msg, ok }: { msg: string; ok: boolean }) {
   return (
@@ -57,6 +54,8 @@ export default function ScheduleClient({ rules, accounts, students, teachers, le
   const [search, setSearch] = useState("");
   const [filterTeacher, setFilterTeacher] = useState("");
   const [hideInactive, setHideInactive] = useState(true);
+
+  const { askConfirm } = useConfirm();
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -105,47 +104,104 @@ export default function ScheduleClient({ rules, accounts, students, teachers, le
   };
 
   const handleToggle = (rule: ScheduleRule) => {
-    startTransition(async () => {
-      const newStatus = rule.active_status === "Active" ? "Inactive" : "Active";
-      const res = await toggleScheduleRule(rule.id, newStatus as any);
-      if (res.error) showToast(res.error, false);
-      else showToast(newStatus === "Active" ? "已啟用規則" : "已停用規則");
-      closeModal();
+    const isActive = rule.active_status === "Active";
+    const wdLabels = (rule.weekdays as number[]).sort().map((d) => `週${["日","一","二","三","四","五","六"][d]}`).join("、");
+    askConfirm({
+      title: isActive ? "停用排課規則" : "啟用排課規則",
+      message: isActive
+        ? `即將停用這條規則:
+${wdLabels} ${rule.time}
+
+停用後不會再自動生成新課程(已生成的課程不受影響)。
+
+若要換時間,可以直接編輯這條規則。`
+        : `即將啟用這條規則:
+${wdLabels} ${rule.time}
+
+啟用後可以用「生成」按鈕產出新課程。`,
+      confirmLabel: isActive ? "確認停用" : "確認啟用",
+      onConfirm: async () => {
+        const newStatus = isActive ? "Inactive" : "Active";
+        const res = await toggleScheduleRule(rule.id, newStatus as any);
+        if (res.error) showToast(res.error, false);
+        else showToast(isActive ? "已停用規則" : "已啟用規則");
+        closeModal();
+      },
     });
   };
 
   const handleDelete = (rule: ScheduleRule) => {
-    startTransition(async () => {
-      const res = await deleteScheduleRule(rule.id);
-      if (res.error) showToast(res.error, false);
-      else showToast("已刪除規則");
-      closeModal();
+    const wdLabels = (rule.weekdays as number[]).sort().map((d) => `週${["日","一","二","三","四","五","六"][d]}`).join("、");
+    askConfirm({
+      title: "刪除排課規則",
+      message: `即將刪除這條規則:
+${wdLabels} ${rule.time}
+
+已生成的課程不會刪除,但這條規則之後不會再生成新課。`,
+      confirmLabel: "確認刪除",
+      danger: true,
+      onConfirm: async () => {
+        const res = await deleteScheduleRule(rule.id);
+        if (res.error) showToast(res.error, false);
+        else showToast("已刪除規則");
+        closeModal();
+      },
     });
   };
 
   const handleGenerate = (rule: ScheduleRule) => {
-    startTransition(async () => {
-      const res = await generateLessonsForAccount(rule.account_id);
-      if (res.error) showToast(res.error, false);
-      else showToast(res.added === 0 ? "堂數已滿,無需生成" : `已生成 ${res.added} 堂課`);
+    const acc = accountById[rule.account_id];
+    const student = acc ? studentById[acc.student_id] : null;
+    const existing = lessons.filter((l) => l.account_id === rule.account_id && l.is_active && l.class_type === "general").length;
+    const total = acc?.total_lessons || 0;
+    askConfirm({
+      title: "生成課程",
+      message: `即將為「${student?.zh_name || "?"} - ${acc?.course_label || "?"}」生成課程。
+
+生成邏輯:考慮該帳戶所有生效規則,穿插排列日期,直到達成 ${total} 堂為止。
+
+目前已存在 ${existing} 堂 active 一般課,將補到 ${total} 堂。`,
+      confirmLabel: "確認生成",
+      onConfirm: async () => {
+        const res = await generateLessonsForAccount(rule.account_id);
+        if (res.error) showToast(res.error, false);
+        else showToast(res.added === 0 ? "堂數已滿,無需生成" : `已生成 ${res.added} 堂課`);
+      },
     });
   };
 
   const handleGenerateAll = () => {
-    startTransition(async () => {
-      const res = await generateAll();
-      if (res.error) showToast(res.error, false);
-      else showToast(`已掃描 ${res.accountCount} 個帳戶,新增 ${res.totalAdded} 堂課`);
-      closeModal();
+    askConfirm({
+      title: "一次生成全部",
+      message: `即將為所有生效規則的帳戶批次生成課程。
+
+涉及 ${activeRuleAccountCount} 個帳戶,依各自剩餘堂數補齊。
+
+已存在的日期+時間不重複產生,不超過堂數上限。
+
+生成後可以到「課程管理」檢視。`,
+      confirmLabel: "確認生成全部",
+      onConfirm: async () => {
+        const res = await generateAll();
+        if (res.error) showToast(res.error, false);
+        else showToast(`已掃描 ${res.accountCount} 個帳戶,新增 ${res.totalAdded} 堂課`);
+      },
     });
   };
 
   const handleCleanOrphans = () => {
-    startTransition(async () => {
-      const res = await deleteOrphanRules();
-      if (res.error) showToast(res.error, false);
-      else showToast(`已清理 ${res.deleted} 條孤兒規則`);
-      closeModal();
+    askConfirm({
+      title: "清理孤兒規則",
+      message: `發現 ${orphanRules.length} 條排課規則對應的帳戶已不存在。
+
+清理後這些規則會被刪除,已生成的課程不受影響。`,
+      confirmLabel: "確認清理",
+      danger: true,
+      onConfirm: async () => {
+        const res = await deleteOrphanRules();
+        if (res.error) showToast(res.error, false);
+        else showToast(`已清理 ${res.deleted} 條孤兒規則`);
+      },
     });
   };
 
@@ -164,7 +220,7 @@ export default function ScheduleClient({ rules, accounts, students, teachers, le
         <div className="flex items-end justify-between flex-wrap gap-3">
           <h2 className="text-2xl md:text-3xl" style={{ color: C.navy }}>排課管理</h2>
           <div className="flex gap-2 flex-wrap">
-<Btn kind="gold" size="md" onClick={() => setModal({ kind: "confirm-generate-all" })}>
+<Btn kind="gold" size="md" onClick={handleGenerateAll}>
               一次生成全部
             </Btn>
             <Btn kind="primary" size="md" onClick={() => setModal({ kind: "add" })}>＋ 新增規則</Btn>
@@ -197,7 +253,7 @@ export default function ScheduleClient({ rules, accounts, students, teachers, le
           <Btn
             kind="danger"
             size="sm"
-            onClick={() => setModal({ kind: "confirm-clean-orphans", count: orphanRules.length })}
+            onClick={handleCleanOrphans}
           >
             一鍵清理
           </Btn>
@@ -316,14 +372,14 @@ export default function ScheduleClient({ rules, accounts, students, teachers, le
                       <Btn
                         kind="ghost"
                         size="sm"
-                        onClick={() => setModal({ kind: "confirm-toggle", rule })}
+                        onClick={() => handleToggle(rule)}
                       >
                         {isActive ? "停用" : "啟用"}
                       </Btn>
                       <Btn
                         kind="danger"
                         size="sm"
-                        onClick={() => setModal({ kind: "confirm-delete", rule })}
+                        onClick={() => handleDelete(rule)}
                       >
                         刪除
                       </Btn>
@@ -349,102 +405,6 @@ export default function ScheduleClient({ rules, accounts, students, teachers, le
           onClose={closeModal}
         />
       )}
-
-      {modal.kind === "confirm-generate-all" && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(10,30,54,0.55)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
-        >
-          <div className="w-full max-w-md rounded-2xl p-5 space-y-4" style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}>
-            <h3 className="text-base font-semibold" style={{ color: C.navy }}>一次生成全部課程</h3>
-            <div className="rounded-lg p-3 text-sm" style={{ background: "#EAF0F6", color: C.navy, lineHeight: 1.8 }}>
-              即將掃描 <strong>{activeRuleAccountCount}</strong> 個有生效排課規則的帳戶,依剩餘堂數自動補齊排課。
-              每個帳戶不超過總堂數上限,已存在的日期+時間不重複產生。
-              此動作可能一次新增數十堂課,建議先確認排課規則都是最新的。
-            </div>
-            <div className="flex justify-end gap-2">
-              <Btn kind="ghost" size="sm" onClick={closeModal}>取消</Btn>
-              <Btn kind="gold" size="sm" disabled={isPending} onClick={handleGenerateAll}>
-                {isPending ? "生成中…" : "確認生成"}
-              </Btn>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {modal.kind === "confirm-toggle" && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(10,30,54,0.55)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
-        >
-          <div className="w-full max-w-sm rounded-2xl p-5 space-y-4" style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}>
-            <h3 className="text-base font-semibold" style={{ color: C.navy }}>
-              {modal.rule.active_status === "Active" ? "停用" : "啟用"}排課規則？
-            </h3>
-            {modal.rule.active_status === "Active" && (
-              <p className="text-sm" style={{ color: C.text }}>
-                停用後不再自動生成新課,已生成的課程不受影響。
-              </p>
-            )}
-            <div className="flex justify-end gap-2">
-              <Btn kind="ghost" size="sm" onClick={closeModal}>取消</Btn>
-              <Btn
-                kind={modal.rule.active_status === "Active" ? "danger" : "good"}
-                size="sm"
-                disabled={isPending}
-                onClick={() => handleToggle(modal.rule)}
-              >
-                {isPending ? "處理中…" : modal.rule.active_status === "Active" ? "確認停用" : "確認啟用"}
-              </Btn>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {modal.kind === "confirm-delete" && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(10,30,54,0.55)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
-        >
-          <div className="w-full max-w-sm rounded-2xl p-5 space-y-4" style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}>
-            <h3 className="text-base font-semibold" style={{ color: C.red }}>刪除排課規則？</h3>
-            <p className="text-sm" style={{ color: C.text }}>
-              已生成的課程不受影響,但之後不會再依此規則產出新課。
-            </p>
-            <div className="flex justify-end gap-2">
-              <Btn kind="ghost" size="sm" onClick={closeModal}>取消</Btn>
-              <Btn kind="danger" size="sm" disabled={isPending} onClick={() => handleDelete(modal.rule)}>
-                {isPending ? "刪除中…" : "確認刪除"}
-              </Btn>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {modal.kind === "confirm-clean-orphans" && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(10,30,54,0.55)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
-        >
-          <div className="w-full max-w-sm rounded-2xl p-5 space-y-4" style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}>
-            <h3 className="text-base font-semibold" style={{ color: C.red }}>清理孤兒規則</h3>
-            <p className="text-sm" style={{ color: C.text }}>
-              將刪除 <strong>{modal.count}</strong> 條找不到對應帳戶的規則。此操作無法復原。
-            </p>
-            <div className="flex justify-end gap-2">
-              <Btn kind="ghost" size="sm" onClick={closeModal}>取消</Btn>
-              <Btn kind="danger" size="sm" disabled={isPending} onClick={handleCleanOrphans}>
-                {isPending ? "清理中…" : "確認清理"}
-              </Btn>
-            </div>
-          </div>
-        </div>
-      )}
-
       {toast && <Toast msg={toast.msg} ok={toast.ok} />}
     </div>
   );

@@ -11,6 +11,7 @@ import Btn from "@/components/ui/Btn";
 import Badge from "@/components/ui/Badge";
 import { Table, Td } from "@/components/ui/Table";
 import Empty from "@/components/ui/Empty";
+import { useConfirm } from "@/components/ConfirmProvider";
 import {
   createStudent, updateStudent, setStudentStatus,
   importStudentsCSV, deleteStudent,
@@ -370,6 +371,8 @@ export default function StudentsClient({ students, teachers, accounts, lessons, 
   const [filterStatus, setFilterStatus] = useState<StudentStatus | "">( "Active");
   const [filterTeacher, setFilterTeacher] = useState("");
 
+  const { askConfirm } = useConfirm();
+
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
     setTimeout(() => setToast(null), 3000);
@@ -439,11 +442,32 @@ export default function StudentsClient({ students, teachers, accounts, lessons, 
     });
   };
 
-  const handleStatusChange = (student: Student, status: StudentStatus) => {
-    startTransition(async () => {
-      const res = await setStudentStatus(student.id, status);
-      if (res.error) showToast(res.error, false);
-      else showToast(`${student.zh_name} 狀態已更新`);
+  const handleStatusChange = (student: Student, newStatus: StudentStatus) => {
+    const needConfirm = student.status === "Active" && (newStatus === "Paused" || newStatus === "Closed");
+    const newLabel = newStatus === "Active" ? "在學" : newStatus === "Paused" ? "暫停中" : "已結束";
+
+    const doChange = () => {
+      startTransition(async () => {
+        const res = await setStudentStatus(student.id, newStatus);
+        if (res.error) showToast(res.error, false);
+        else showToast(`${student.zh_name} 狀態已更新為「${newLabel}」`);
+      });
+    };
+
+    if (!needConfirm) { doChange(); return; }
+
+    const stuAccounts = accounts.filter((a) => a.student_id === student.id && !a.status_override);
+    const stuUpcoming = lessons.filter((l) => l.student_id === student.id && l.is_active && l.status === "scheduled").length;
+
+    askConfirm({
+      title: `變更狀態為「${newLabel}」`,
+      message: `即將把「${student.zh_name}」的狀態變更為「${newLabel}」。
+
+目前有 ${stuAccounts.length} 個進行中帳戶 / ${stuUpcoming} 堂待上課程。
+
+狀態變更不會刪除任何資料,只影響清單顯示與篩選。`,
+      confirmLabel: "確認變更",
+      onConfirm: doChange,
     });
   };
 

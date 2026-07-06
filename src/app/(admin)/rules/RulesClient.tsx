@@ -11,6 +11,7 @@ import Badge from "@/components/ui/Badge";
 import { Table, Td } from "@/components/ui/Table";
 import Empty from "@/components/ui/Empty";
 import RuleFormModal from "./RuleFormModal";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { togglePriceRule } from "@/app/actions/rules";
 
 interface Props {
@@ -22,7 +23,6 @@ type ModalState =
   | { kind: "none" }
   | { kind: "add" }
   | { kind: "edit"; rule: PriceRule }
-  | { kind: "confirm-toggle"; rule: PriceRule };
 
 function Toast({ msg, ok }: { msg: string; ok: boolean }) {
   return (
@@ -52,6 +52,8 @@ export default function RulesClient({ rules, usageCounts }: Props) {
   const [isPending, startTransition] = useTransition();
   const [showInactive, setShowInactive] = useState(false);
 
+  const { askConfirm } = useConfirm();
+
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
     setTimeout(() => setToast(null), 3000);
@@ -61,12 +63,25 @@ export default function RulesClient({ rules, usageCounts }: Props) {
   const filtered = showInactive ? rules : rules.filter((r) => r.active_status === "Active");
 
   const handleToggle = (rule: PriceRule) => {
-    startTransition(async () => {
-      const newStatus: ActiveStatus = rule.active_status === "Active" ? "Inactive" : "Active";
-      const res = await togglePriceRule(rule.id, newStatus);
-      if (res.error) showToast(res.error, false);
-      else showToast(newStatus === "Active" ? `已啟用 ${rule.display_name}` : `已停用 ${rule.display_name}`);
-      closeModal();
+    const isActive = rule.active_status === "Active";
+    const usageCount = usageCounts[rule.price_rule_code] || 0;
+    askConfirm({
+      title: isActive ? "停用價格規則" : "啟用價格規則",
+      message: isActive
+        ? `即將停用「${rule.display_name}」(${rule.price_rule_code})
+
+目前有 ${usageCount} 個帳戶使用這個規則(這些帳戶的 snapshot 已凍結,不受影響)
+
+停用後開課選單不會出現這個方案。`
+        : `即將啟用「${rule.display_name}」,之後開課選單會出現。`,
+      confirmLabel: isActive ? "確認停用" : "確認啟用",
+      onConfirm: async () => {
+        const newStatus: ActiveStatus = isActive ? "Inactive" : "Active";
+        const res = await togglePriceRule(rule.id, newStatus);
+        if (res.error) showToast(res.error, false);
+        else showToast(isActive ? `已停用 ${rule.display_name}` : `已啟用 ${rule.display_name}`);
+        closeModal();
+      },
     });
   };
 
@@ -154,7 +169,7 @@ export default function RulesClient({ rules, usageCounts }: Props) {
                       <Btn
                         kind={isActive ? "ghost" : "good"}
                         size="sm"
-                        onClick={() => setModal({ kind: "confirm-toggle", rule: r })}
+                        onClick={() => handleToggle(r)}
                       >
                         {isActive ? "停用" : "啟用"}
                       </Btn>
@@ -175,43 +190,6 @@ export default function RulesClient({ rules, usageCounts }: Props) {
           onClose={closeModal}
         />
       )}
-
-      {modal.kind === "confirm-toggle" && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(10,30,54,0.55)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
-        >
-          <div className="w-full max-w-sm rounded-2xl p-5 space-y-4" style={{ background: "white", boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}>
-            <h3 className="text-base font-semibold" style={{ color: C.navy }}>
-              {modal.rule.active_status === "Active" ? "停用" : "啟用"}「{modal.rule.display_name}」？
-            </h3>
-            {modal.rule.active_status === "Active" && (
-              <div className="text-sm space-y-2" style={{ color: C.text }}>
-                <p>停用後開課選單不會出現這個方案。</p>
-                {(usageCounts[modal.rule.price_rule_code] || 0) > 0 && (
-                  <div className="rounded-lg p-3" style={{ background: "#EAF0F6", color: C.navy }}>
-                    已有 <strong>{usageCounts[modal.rule.price_rule_code]}</strong> 個帳戶使用此方案,
-                    snapshot 已凍結,停用不影響這些帳戶的計算。
-                  </div>
-                )}
-              </div>
-            )}
-            <div className="flex justify-end gap-2">
-              <Btn kind="ghost" size="sm" onClick={closeModal}>取消</Btn>
-              <Btn
-                kind={modal.rule.active_status === "Active" ? "danger" : "good"}
-                size="sm"
-                disabled={isPending}
-                onClick={() => handleToggle(modal.rule)}
-              >
-                {isPending ? "處理中…" : modal.rule.active_status === "Active" ? "確認停用" : "確認啟用"}
-              </Btn>
-            </div>
-          </div>
-        </div>
-      )}
-
       {toast && <Toast msg={toast.msg} ok={toast.ok} />}
     </div>
   );
