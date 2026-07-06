@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition, useMemo } from "react";
 import { C } from "@/lib/constants";
+import { todayYMD } from "@/lib/utils";
 import type { Student, Teacher, Account, Lesson, StudentStatus } from "@/lib/supabase/types";
 import PageIntro from "@/components/ui/PageIntro";
 import Card from "@/components/ui/Card";
@@ -10,10 +11,8 @@ import Badge from "@/components/ui/Badge";
 import { Table, Td } from "@/components/ui/Table";
 import Empty from "@/components/ui/Empty";
 import {
-  createStudent,
-  updateStudent,
-  setStudentStatus,
-  importStudentsCSV,
+  createStudent, updateStudent, setStudentStatus,
+  importStudentsCSV, deleteStudent,
 } from "@/app/actions/students";
 
 type PartialTeacher = Pick<Teacher, "id" | "teacher_name" | "teacher_type" | "active_status">;
@@ -32,46 +31,49 @@ type ModalState =
   | { kind: "add" }
   | { kind: "edit"; student: Student }
   | { kind: "detail"; student: Student }
-  | { kind: "csv" };
-
-const EMPTY_FORM = {
-  zh_name: "",
-  en_name: "",
-  zoom_email: "",
-  contact_info: "",
-  age: "",
-  current_teacher_id: "",
-};
+  | { kind: "csv" }
+  | { kind: "confirm-delete-warn"; student: Student }
+  | { kind: "confirm-delete-final"; student: Student };
 
 const STATUS_LABEL: Record<StudentStatus, string> = {
-  Active: "學習中",
-  Paused: "暫停中",
-  Closed: "已結束",
+  Active: "在學", Paused: "暫停中", Closed: "已結束",
 };
 
-const STATUS_TONE: Record<StudentStatus, "green" | "amber" | "gray"> = {
-  Active: "green",
-  Paused: "amber",
-  Closed: "gray",
+const EMPTY_FORM = {
+  zh_name: "", en_name: "", zoom_email: "",
+  contact_info: "", age: "", current_teacher_id: "",
 };
+
+// ── CSV utility ───────────────────────────────────────────────────────────────
+function escapeCell(v: string) {
+  if (/[,"\n]/.test(v)) return '"' + v.replace(/"/g, '""') + '"';
+  return v;
+}
+function downloadCSV(filename: string, headers: string[], rows: (string | number)[]) {
+  const lines = [headers, ...rows.map((r) => r)].map((row) =>
+    (Array.isArray(row) ? row : [row]).map((c) => escapeCell(String(c ?? ""))).join(",")
+  );
+  const csv = "\uFEFF" + lines.join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 function Toast({ msg, ok }: { msg: string; ok: boolean }) {
   return (
-    <div
-      className="fixed bottom-5 right-5 z-50 rounded-xl px-4 py-3 text-sm font-medium shadow-lg"
-      style={{ background: ok ? C.green : C.red, color: "#fff", maxWidth: 320 }}
-    >
+    <div className="fixed bottom-5 right-5 z-50 rounded-xl px-4 py-3 text-sm font-medium shadow-lg"
+      style={{ background: ok ? C.green : C.red, color: "#fff", maxWidth: 320 }}>
       {msg}
     </div>
   );
 }
 
 function StudentForm({
-  initial,
-  teachers,
-  onSave,
-  onCancel,
-  isPending,
+  initial, teachers, onSave, onCancel, isPending,
 }: {
   initial: typeof EMPTY_FORM;
   teachers: PartialTeacher[];
@@ -80,8 +82,7 @@ function StudentForm({
   isPending: boolean;
 }) {
   const [form, setForm] = useState(initial);
-  const set = (k: keyof typeof EMPTY_FORM, v: string) =>
-    setForm((p) => ({ ...p, [k]: v }));
+  const set = (k: keyof typeof EMPTY_FORM, v: string) => setForm((p) => ({ ...p, [k]: v }));
   const activeTeachers = teachers.filter((t) => t.active_status === "Active");
 
   return (
@@ -91,91 +92,59 @@ function StudentForm({
           <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
             中文姓名 <span style={{ color: C.red }}>*</span>
           </label>
-          <input
-            className="w-full rounded-lg border px-3 py-2 text-sm"
+          <input className="w-full rounded-lg border px-3 py-2 text-sm"
             style={{ borderColor: C.line, color: C.text }}
-            value={form.zh_name}
-            onChange={(e) => set("zh_name", e.target.value)}
-            placeholder="e.g. 王小明"
-          />
+            value={form.zh_name} onChange={(e) => set("zh_name", e.target.value)}
+            placeholder="e.g. 王小明" />
         </div>
         <div>
-          <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
-            英文名
-          </label>
-          <input
-            className="w-full rounded-lg border px-3 py-2 text-sm"
+          <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>英文名</label>
+          <input className="w-full rounded-lg border px-3 py-2 text-sm"
             style={{ borderColor: C.line, color: C.text }}
-            value={form.en_name}
-            onChange={(e) => set("en_name", e.target.value)}
-            placeholder="e.g. Andy"
-          />
+            value={form.en_name} onChange={(e) => set("en_name", e.target.value)}
+            placeholder="e.g. Andy" />
         </div>
       </div>
       <div>
-        <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
-          Zoom Email
-        </label>
-        <input
-          className="w-full rounded-lg border px-3 py-2 text-sm"
+        <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>Zoom Email</label>
+        <input className="w-full rounded-lg border px-3 py-2 text-sm"
           style={{ borderColor: C.line, color: C.text }}
-          value={form.zoom_email}
-          onChange={(e) => set("zoom_email", e.target.value)}
-          placeholder="zoom@example.com"
-        />
+          value={form.zoom_email} onChange={(e) => set("zoom_email", e.target.value)}
+          placeholder="zoom@example.com" />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
-            聯絡資訊
-          </label>
-          <input
-            className="w-full rounded-lg border px-3 py-2 text-sm"
+          <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>聯絡資訊</label>
+          <input className="w-full rounded-lg border px-3 py-2 text-sm"
             style={{ borderColor: C.line, color: C.text }}
-            value={form.contact_info}
-            onChange={(e) => set("contact_info", e.target.value)}
-            placeholder="LINE / 電話"
-          />
+            value={form.contact_info} onChange={(e) => set("contact_info", e.target.value)}
+            placeholder="LINE / 電話" />
         </div>
         <div>
-          <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
-            年齡 / 年段
-          </label>
-          <input
-            className="w-full rounded-lg border px-3 py-2 text-sm"
+          <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>年齡 / 年段</label>
+          <input className="w-full rounded-lg border px-3 py-2 text-sm"
             style={{ borderColor: C.line, color: C.text }}
-            value={form.age}
-            onChange={(e) => set("age", e.target.value)}
-            placeholder="e.g. 國中生 / 8"
-          />
+            value={form.age} onChange={(e) => set("age", e.target.value)}
+            placeholder="e.g. 國中生 / 8" />
         </div>
       </div>
       <div>
-        <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
-          目前老師
-        </label>
-        <select
-          className="w-full rounded-lg border px-3 py-2 text-sm"
+        <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>目前老師</label>
+        <select className="w-full rounded-lg border px-3 py-2 text-sm"
           style={{ borderColor: C.line, color: C.text }}
           value={form.current_teacher_id}
-          onChange={(e) => set("current_teacher_id", e.target.value)}
-        >
+          onChange={(e) => set("current_teacher_id", e.target.value)}>
           <option value="">— 未指定 —</option>
           {activeTeachers.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.teacher_name}
-            </option>
+            <option key={t.id} value={t.id}>{t.teacher_name}</option>
           ))}
         </select>
       </div>
       <div className="flex justify-end gap-2 pt-1">
         <Btn kind="ghost" size="sm" onClick={onCancel} disabled={isPending}>取消</Btn>
-        <Btn
-          kind="primary"
-          size="sm"
+        <Btn kind="primary" size="sm"
           disabled={!form.zh_name.trim() || isPending}
-          onClick={() => onSave(form)}
-        >
+          onClick={() => onSave(form)}>
           {isPending ? "儲存中…" : "儲存"}
         </Btn>
       </div>
@@ -183,33 +152,19 @@ function StudentForm({
   );
 }
 
-function CsvImportPanel({
-  onDone,
-  onCancel,
-}: {
-  onDone: (msg: string) => void;
-  onCancel: () => void;
-}) {
+function CsvImportPanel({ onDone, onCancel }: { onDone: (msg: string) => void; onCancel: () => void }) {
   const [raw, setRaw] = useState("");
   const [isPending, start] = useTransition();
   const [preview, setPreview] = useState<string[][]>([]);
 
-  const parse = (text: string) => {
-    const lines = text.trim().split("\n").filter(Boolean);
-    return lines.map((l) => l.split(",").map((c) => c.trim()));
-  };
-
-  const handleParse = () => setPreview(parse(raw));
+  const parse = (text: string) =>
+    text.trim().split("\n").filter(Boolean).map((l) => l.split(",").map((c) => c.trim()));
 
   const handleImport = () => {
     const rows = parse(raw).map((cols) => ({
-      zh_name: cols[0] || "",
-      en_name: cols[1] || "",
-      zoom_email: cols[2] || "",
-      contact_info: cols[3] || "",
-      age: cols[4] || "",
+      zh_name: cols[0] || "", en_name: cols[1] || "",
+      zoom_email: cols[2] || "", contact_info: cols[3] || "", age: cols[4] || "",
     })).filter((r) => r.zh_name);
-
     start(async () => {
       const res = await importStudentsCSV(rows);
       if (res.error) onDone("匯入失敗:" + res.error);
@@ -221,17 +176,11 @@ function CsvImportPanel({
     <div className="space-y-3">
       <div className="text-xs rounded-lg p-3" style={{ background: "#EAF0F6", color: C.navy, lineHeight: 1.8 }}>
         <strong>CSV 格式</strong>(逗號分隔,每行一位):<br />
-        中文姓名, 英文名, Zoom Email, 聯絡資訊, 年齡<br />
-        <span style={{ color: C.muted }}>例: 王小明, Andy, andy@gmail.com, LINE:andy, 國中生</span>
+        中文姓名, 英文名, Zoom Email, 聯絡資訊, 年齡
       </div>
-      <textarea
-        className="w-full rounded-lg border px-3 py-2 text-sm font-mono resize-none"
-        style={{ borderColor: C.line, color: C.text }}
-        rows={6}
-        placeholder={"王小明, Andy, andy@gmail.com, LINE:andy, 國中生\n李曉華, Lily, lily@gmail.com, 0912-345-678, 7"}
-        value={raw}
-        onChange={(e) => { setRaw(e.target.value); setPreview([]); }}
-      />
+      <textarea className="w-full rounded-lg border px-3 py-2 text-sm font-mono resize-none"
+        style={{ borderColor: C.line, color: C.text }} rows={6}
+        value={raw} onChange={(e) => { setRaw(e.target.value); setPreview([]); }} />
       {preview.length > 0 && (
         <div className="text-xs rounded-lg overflow-auto" style={{ border: `1px solid ${C.line}`, maxHeight: 160 }}>
           <table className="w-full" style={{ borderCollapse: "collapse" }}>
@@ -257,7 +206,7 @@ function CsvImportPanel({
       <div className="flex justify-end gap-2">
         <Btn kind="ghost" size="sm" onClick={onCancel}>取消</Btn>
         {preview.length === 0 ? (
-          <Btn kind="ghost" size="sm" disabled={!raw.trim()} onClick={handleParse}>預覽</Btn>
+          <Btn kind="ghost" size="sm" disabled={!raw.trim()} onClick={() => setPreview(parse(raw))}>預覽</Btn>
         ) : (
           <Btn kind="primary" size="sm" disabled={isPending} onClick={handleImport}>
             {isPending ? "匯入中…" : `匯入 ${preview.filter((r) => r[0]).length} 位`}
@@ -268,113 +217,13 @@ function CsvImportPanel({
   );
 }
 
-function DetailModal({
-  student,
-  accounts,
-  lessons,
-  teachers,
-  onClose,
-}: {
-  student: Student;
-  accounts: PartialAccount[];
-  lessons: PartialLesson[];
-  teachers: PartialTeacher[];
-  onClose: () => void;
-}) {
-  const sAccounts = accounts.filter((a) => a.student_id === student.id);
-  const teacherById = Object.fromEntries(teachers.map((t) => [t.id, t]));
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(10,30,54,0.55)" }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div
-        className="w-full max-w-lg rounded-2xl p-5 md:p-6 space-y-4 overflow-y-auto"
-        style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)", maxHeight: "90vh" }}
-      >
-        <div className="flex items-start justify-between">
-          <div>
-            <h3 className="text-lg font-semibold" style={{ color: C.navy }}>{student.zh_name}</h3>
-            {student.en_name && (
-              <div className="text-sm" style={{ color: C.muted }}>{student.en_name}</div>
-            )}
-          </div>
-          <button onClick={onClose} className="text-xl" style={{ color: C.muted }}>×</button>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          {[
-            ["Zoom", student.zoom_email || "—"],
-            ["聯絡", student.contact_info || "—"],
-            ["年齡", student.age || "—"],
-            ["老師", teacherById[student.current_teacher_id || ""]?.teacher_name || "—"],
-          ].map(([label, val]) => (
-            <div key={label} className="rounded-lg p-2.5" style={{ background: "#F7F5EF" }}>
-              <div className="text-xs" style={{ color: C.muted }}>{label}</div>
-              <div style={{ color: C.text }}>{val}</div>
-            </div>
-          ))}
-        </div>
-
-        <div>
-          <div className="text-xs font-semibold mb-2" style={{ color: C.muted, letterSpacing: "0.05em" }}>
-            課程帳戶({sAccounts.length})
-          </div>
-          {sAccounts.length === 0 ? (
-            <div className="text-sm" style={{ color: C.muted }}>尚無課程帳戶。</div>
-          ) : (
-            <div className="space-y-2">
-              {sAccounts.map((a) => {
-                const aLessons = lessons.filter((l) => l.account_id === a.id && l.is_active);
-                const completed = aLessons.filter((l) => l.status === "completed").length;
-                const remaining = a.total_lessons - completed;
-                const isClosed = a.status_override === "Closed";
-                return (
-                  <div
-                    key={a.id}
-                    className="rounded-lg p-3 flex items-center justify-between gap-2"
-                    style={{ border: `1px solid ${C.line}`, opacity: isClosed ? 0.6 : 1 }}
-                  >
-                    <div>
-                      <div className="text-sm font-medium" style={{ color: C.navy }}>
-                        {a.course_label}
-                        {a.is_trial && (
-                          <Badge tone="gold">試聽</Badge>
-                        )}
-                      </div>
-                      <div className="text-xs mt-0.5" style={{ color: C.muted }}>
-                        已完 {completed} / 共 {a.total_lessons} 堂
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold" style={{ color: remaining > 0 ? C.navy : C.muted }}>
-                        {remaining}
-                      </div>
-                      <div className="text-xs" style={{ color: C.muted }}>剩餘</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-end">
-          <Btn kind="ghost" size="sm" onClick={onClose}>關閉</Btn>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function StudentsClient({ students, teachers, accounts, lessons }: Props) {
   const [modal, setModal] = useState<ModalState>({ kind: "none" });
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState<StudentStatus | "">("");
+  // #5: 預設「在學」
+  const [filterStatus, setFilterStatus] = useState<StudentStatus | "">( "Active");
   const [filterTeacher, setFilterTeacher] = useState("");
 
   const showToast = (msg: string, ok = true) => {
@@ -383,31 +232,66 @@ export default function StudentsClient({ students, teachers, accounts, lessons }
   };
   const closeModal = () => setModal({ kind: "none" });
 
-  const teacherById = Object.fromEntries(teachers.map((t) => [t.id, t]));
+  const teacherById = useMemo(
+    () => Object.fromEntries(teachers.map((t) => [t.id, t])),
+    [teachers]
+  );
 
-  const filtered = students.filter((s) => {
-    const q = search.toLowerCase();
-    const matchQ =
-      !q ||
-      s.zh_name.toLowerCase().includes(q) ||
-      (s.en_name || "").toLowerCase().includes(q) ||
-      (s.zoom_email || "").toLowerCase().includes(q);
-    const matchStatus = !filterStatus || s.status === filterStatus;
-    const matchTeacher = !filterTeacher || s.current_teacher_id === filterTeacher;
-    return matchQ && matchStatus && matchTeacher;
-  });
+  // 帳戶剩餘計算
+  const getStudentRemaining = (sid: string) =>
+    accounts
+      .filter((a) => a.student_id === sid && !a.is_trial && a.status_override !== "Closed")
+      .reduce((sum, a) => {
+        const completed = lessons.filter(
+          (l) => l.account_id === a.id && l.is_active && l.status === "completed"
+        ).length;
+        return sum + Math.max(0, a.total_lessons - completed);
+      }, 0);
+
+  const getStudentAccountCount = (sid: string) =>
+    accounts.filter((a) => a.student_id === sid).length;
+
+  const filtered = useMemo(() => {
+    let list = students;
+    if (filterStatus) list = list.filter((s) => s.status === filterStatus);
+    if (filterTeacher) list = list.filter((s) => s.current_teacher_id === filterTeacher);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((s) =>
+        s.zh_name.toLowerCase().includes(q) ||
+        (s.en_name || "").toLowerCase().includes(q) ||
+        (s.zoom_email || "").toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [students, filterStatus, filterTeacher, search]);
+
+  // #6 CSV 匯出
+  const handleExportCsv = () => {
+    const rows = filtered.map((s) => [
+      s.zh_name,
+      s.en_name || "",
+      s.zoom_email || "",
+      s.contact_info || "",
+      s.age || "",
+      STATUS_LABEL[s.status] || s.status,
+      teacherById[s.current_teacher_id || ""]?.teacher_name || "",
+      String(getStudentRemaining(s.id)),
+    ]);
+    downloadCSV(
+      `bridgeway-students-${todayYMD()}.csv`,
+      ["中文姓名", "英文名", "Email", "聯絡方式", "年齡", "狀態", "當前老師", "剩餘堂數"],
+      rows as any
+    );
+  };
 
   const handleSave = (form: typeof EMPTY_FORM) => {
     startTransition(async () => {
-      const res =
-        modal.kind === "edit"
-          ? await updateStudent(modal.student.id, form)
-          : await createStudent(form);
+      const res = modal.kind === "edit"
+        ? await updateStudent(modal.student.id, form)
+        : await createStudent(form);
       if (res.error) showToast(res.error, false);
-      else {
-        showToast(modal.kind === "edit" ? "已更新學生資料" : "已新增學生");
-        closeModal();
-      }
+      else { showToast(modal.kind === "edit" ? "已更新學生資料" : "已新增學生"); closeModal(); }
     });
   };
 
@@ -415,53 +299,60 @@ export default function StudentsClient({ students, teachers, accounts, lessons }
     startTransition(async () => {
       const res = await setStudentStatus(student.id, status);
       if (res.error) showToast(res.error, false);
-      else showToast(`${student.zh_name} 狀態已更新為「${STATUS_LABEL[status]}」`);
+      else showToast(`${student.zh_name} 狀態已更新`);
     });
   };
 
-  const getStudentSummary = (sid: string) => {
-    const sAccounts = accounts.filter((a) => a.student_id === sid && !a.status_override);
-    const totalRemaining = sAccounts.reduce((sum, a) => {
-      const completed = lessons.filter(
-        (l) => l.account_id === a.id && l.is_active && l.status === "completed"
-      ).length;
-      return sum + Math.max(0, a.total_lessons - completed);
-    }, 0);
-    return { accountCount: sAccounts.length, totalRemaining };
+  // #7 刪除
+  const handleDeleteConfirm = (student: Student) => {
+    const stuAccounts = accounts.filter((a) => a.student_id === student.id);
+    const completed = lessons.filter(
+      (l) => l.student_id === student.id && l.is_active && l.status === "completed"
+    ).length;
+    if (stuAccounts.length > 0 || completed > 0) {
+      setModal({ kind: "confirm-delete-warn", student });
+    } else {
+      setModal({ kind: "confirm-delete-final", student });
+    }
+  };
+
+  const handleDeleteFinal = (student: Student) => {
+    startTransition(async () => {
+      const res = await deleteStudent(student.id);
+      if (res.error) showToast(res.error, false);
+      else { showToast(`已刪除 ${student.zh_name}`); closeModal(); }
+    });
   };
 
   return (
     <div className="space-y-4 md:space-y-5">
       <div className="pb-4" style={{ borderBottom: `1px solid ${C.line}` }}>
-        <div className="text-xs uppercase mb-1.5 bw-display-en" style={{ color: C.muted, letterSpacing: "0.24em", fontStyle: "italic" }}>
+        <div className="text-xs uppercase mb-1.5 bw-display-en"
+          style={{ color: C.muted, letterSpacing: "0.24em", fontStyle: "italic" }}>
           Bridgeway English · Admin
         </div>
         <div className="flex items-end justify-between flex-wrap gap-3">
           <h2 className="text-2xl md:text-3xl" style={{ color: C.navy }}>學生管理</h2>
-          <div className="flex gap-2">
-            <Btn kind="ghost" size="md" onClick={() => setModal({ kind: "csv" })}>
-              批次匯入 CSV
-            </Btn>
-            <Btn kind="gold" size="md" onClick={() => setModal({ kind: "add" })}>
-              + 新增學生
-            </Btn>
+          <div className="flex gap-2 flex-wrap">
+            <Btn kind="ghost" size="md" onClick={handleExportCsv}>CSV 匯出</Btn>
+            <Btn kind="ghost" size="md" onClick={() => setModal({ kind: "csv" })}>批次匯入</Btn>
+            <Btn kind="gold" size="md" onClick={() => setModal({ kind: "add" })}>+ 新增學生</Btn>
           </div>
         </div>
       </div>
 
       <PageIntro storageKey="students" title="學生管理 · 說明">
         <p>管理所有學生基本資料與學習狀態。</p>
-        <p>• 狀態可直接在列表下拉切換:學習中 / 暫停中 / 已結束。</p>
-        <p>• 點「詳情」可查看該學生的所有課程帳戶與剩餘堂數。</p>
-        <p>• 批次匯入 CSV 格式:中文姓名, 英文名, Zoom Email, 聯絡資訊, 年齡。</p>
+        <p>• 狀態可直接在列表下拉切換。點「詳情」可查看課程帳戶與剩餘堂數。</p>
+        <p>• CSV 匯出只匯出目前 filter 後的結果。</p>
       </PageIntro>
 
-      {/* 搜尋與篩選 */}
+      {/* 篩選列 */}
       <div className="flex flex-wrap gap-2">
         <input
           className="rounded-lg border px-3 py-2 text-sm flex-1 min-w-40"
           style={{ borderColor: C.line, color: C.text }}
-          placeholder="搜尋姓名 / 英文名 / Email…"
+          placeholder="搜尋姓名 / Email…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -469,19 +360,17 @@ export default function StudentsClient({ students, teachers, accounts, lessons }
           className="rounded-lg border px-3 py-2 text-sm"
           style={{ borderColor: C.line, color: C.text }}
           value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value as StudentStatus | "")}
-        >
-          <option value="">全部狀態</option>
-          <option value="Active">學習中</option>
+          onChange={(e) => setFilterStatus(e.target.value as StudentStatus | "")}>
+          <option value="Active">在學</option>
           <option value="Paused">暫停中</option>
           <option value="Closed">已結束</option>
+          <option value="">全部</option>
         </select>
         <select
           className="rounded-lg border px-3 py-2 text-sm"
           style={{ borderColor: C.line, color: C.text }}
           value={filterTeacher}
-          onChange={(e) => setFilterTeacher(e.target.value)}
-        >
+          onChange={(e) => setFilterTeacher(e.target.value)}>
           <option value="">全部老師</option>
           {teachers.map((t) => (
             <option key={t.id} value={t.id}>{t.teacher_name}</option>
@@ -494,103 +383,78 @@ export default function StudentsClient({ students, teachers, accounts, lessons }
       >
         {filtered.length === 0 ? (
           <Empty action={<Btn kind="gold" onClick={() => setModal({ kind: "add" })}>+ 新增學生</Btn>}>
-            {students.length === 0 ? "還沒有任何學生。點右上角新增第一位。" : "沒有符合條件的學生。"}
+            {students.length === 0 ? "還沒有任何學生。" : "沒有符合條件的學生。"}
           </Empty>
         ) : (
-          <Table head={["姓名", "老師", "狀態", "剩餘堂數", "帳戶數", "操作"]}>
-            {filtered.map((s) => {
-              const { accountCount, totalRemaining } = getStudentSummary(s.id);
-              return (
-                <tr key={s.id} style={{ borderBottom: `1px solid ${C.line}` }}>
-                  <Td>
-                    <div className="font-medium" style={{ color: C.navy }}>{s.zh_name}</div>
-                    {s.en_name && (
-                      <div className="text-xs" style={{ color: C.muted }}>{s.en_name}</div>
+          <Table head={["姓名", "老師", "狀態", "剩餘堂數", "帳戶", "操作"]}>
+            {filtered.map((s) => (
+              <tr key={s.id} style={{ borderBottom: `1px solid ${C.line}` }}>
+                <Td>
+                  <div className="font-medium" style={{ color: C.navy }}>{s.zh_name}</div>
+                  {s.en_name && <div className="text-xs" style={{ color: C.muted }}>{s.en_name}</div>}
+                </Td>
+                <Td>
+                  <span className="text-sm" style={{ color: C.text }}>
+                    {teacherById[s.current_teacher_id || ""]?.teacher_name || (
+                      <span style={{ color: C.muted }}>—</span>
                     )}
-                  </Td>
-                  <Td>
-                    <span className="text-sm" style={{ color: C.text }}>
-                      {teacherById[s.current_teacher_id || ""]?.teacher_name || (
-                        <span style={{ color: C.muted }}>—</span>
-                      )}
-                    </span>
-                  </Td>
-                  <Td>
-                    <select
-                      className="rounded border px-1.5 py-1 text-xs"
-                      style={{ borderColor: C.line, color: C.text }}
-                      value={s.status}
-                      onChange={(e) => handleStatusChange(s, e.target.value as StudentStatus)}
-                      disabled={isPending}
-                    >
-                      <option value="Active">學習中</option>
-                      <option value="Paused">暫停中</option>
-                      <option value="Closed">已結束</option>
-                    </select>
-                  </Td>
-                  <Td>
-                    <span
-                      className="text-sm font-medium"
-                      style={{ color: totalRemaining > 0 ? C.navy : C.muted }}
-                    >
-                      {totalRemaining > 0 ? `${totalRemaining} 堂` : "—"}
-                    </span>
-                  </Td>
-                  <Td>
-                    <span className="text-sm" style={{ color: C.muted }}>{accountCount}</span>
-                  </Td>
-                  <Td>
-                    <div className="flex gap-1.5 flex-wrap">
-                      <Btn
-                        kind="ghost"
-                        size="sm"
-                        onClick={() => setModal({ kind: "detail", student: s })}
-                      >
-                        詳情
-                      </Btn>
-                      <Btn
-                        kind="ghost"
-                        size="sm"
-                        onClick={() => setModal({ kind: "edit", student: s })}
-                      >
-                        編輯
-                      </Btn>
-                    </div>
-                  </Td>
-                </tr>
-              );
-            })}
+                  </span>
+                </Td>
+                <Td>
+                  <select
+                    className="rounded border px-1.5 py-1 text-xs"
+                    style={{ borderColor: C.line, color: C.text }}
+                    value={s.status}
+                    onChange={(e) => handleStatusChange(s, e.target.value as StudentStatus)}
+                    disabled={isPending}>
+                    <option value="Active">在學</option>
+                    <option value="Paused">暫停中</option>
+                    <option value="Closed">已結束</option>
+                  </select>
+                </Td>
+                <Td>
+                  <span className="text-sm font-medium"
+                    style={{ color: getStudentRemaining(s.id) > 0 ? C.navy : C.muted }}>
+                    {getStudentRemaining(s.id) > 0 ? `${getStudentRemaining(s.id)} 堂` : "—"}
+                  </span>
+                </Td>
+                <Td>
+                  <span className="text-sm" style={{ color: C.muted }}>
+                    {getStudentAccountCount(s.id)}
+                  </span>
+                </Td>
+                <Td>
+                  <div className="flex gap-1.5 flex-wrap">
+                    <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "detail", student: s })}>詳情</Btn>
+                    <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "edit", student: s })}>編輯</Btn>
+                    <Btn kind="danger" size="sm" onClick={() => handleDeleteConfirm(s)}>刪除</Btn>
+                  </div>
+                </Td>
+              </tr>
+            ))}
           </Table>
         )}
       </Card>
 
-      {/* Add / Edit Modal */}
+      {/* Add/Edit Modal */}
       {(modal.kind === "add" || modal.kind === "edit") && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: "rgba(10,30,54,0.55)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
-        >
-          <div
-            className="w-full max-w-md rounded-2xl p-5 md:p-6 space-y-4"
-            style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}
-          >
+          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
+          <div className="w-full max-w-md rounded-2xl p-5 md:p-6 space-y-4"
+            style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}>
             <h3 className="text-base font-semibold" style={{ color: C.navy }}>
               {modal.kind === "add" ? "新增學生" : `編輯 · ${modal.student.zh_name}`}
             </h3>
             <StudentForm
-              initial={
-                modal.kind === "edit"
-                  ? {
-                      zh_name: modal.student.zh_name,
-                      en_name: modal.student.en_name || "",
-                      zoom_email: modal.student.zoom_email || "",
-                      contact_info: modal.student.contact_info || "",
-                      age: modal.student.age || "",
-                      current_teacher_id: modal.student.current_teacher_id || "",
-                    }
-                  : EMPTY_FORM
-              }
+              initial={modal.kind === "edit" ? {
+                zh_name: modal.student.zh_name,
+                en_name: modal.student.en_name || "",
+                zoom_email: modal.student.zoom_email || "",
+                contact_info: modal.student.contact_info || "",
+                age: modal.student.age || "",
+                current_teacher_id: modal.student.current_teacher_id || "",
+              } : EMPTY_FORM}
               teachers={teachers}
               onSave={handleSave}
               onCancel={closeModal}
@@ -600,18 +464,82 @@ export default function StudentsClient({ students, teachers, accounts, lessons }
         </div>
       )}
 
+      {/* Detail Modal */}
+      {modal.kind === "detail" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(10,30,54,0.55)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
+          <div className="w-full max-w-lg rounded-2xl p-5 md:p-6 space-y-4 overflow-y-auto"
+            style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)", maxHeight: "90vh" }}>
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-semibold" style={{ color: C.navy }}>{modal.student.zh_name}</h3>
+                {modal.student.en_name && (
+                  <div className="text-sm" style={{ color: C.muted }}>{modal.student.en_name}</div>
+                )}
+              </div>
+              <button onClick={closeModal} className="text-xl" style={{ color: C.muted }}>×</button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              {[
+                ["Zoom", modal.student.zoom_email || "—"],
+                ["聯絡", modal.student.contact_info || "—"],
+                ["年齡", modal.student.age || "—"],
+                ["老師", teacherById[modal.student.current_teacher_id || ""]?.teacher_name || "—"],
+              ].map(([label, val]) => (
+                <div key={label} className="rounded-lg p-2.5" style={{ background: "#F7F5EF" }}>
+                  <div className="text-xs" style={{ color: C.muted }}>{label}</div>
+                  <div style={{ color: C.text }}>{val}</div>
+                </div>
+              ))}
+            </div>
+            <div>
+              <div className="text-xs font-semibold mb-2" style={{ color: C.muted }}>
+                課程帳戶({accounts.filter((a) => a.student_id === modal.student.id).length})
+              </div>
+              <div className="space-y-2">
+                {accounts.filter((a) => a.student_id === modal.student.id).map((a) => {
+                  const completed = lessons.filter(
+                    (l) => l.account_id === a.id && l.is_active && l.status === "completed"
+                  ).length;
+                  const remaining = a.total_lessons - completed;
+                  return (
+                    <div key={a.id} className="rounded-lg p-3 flex items-center justify-between gap-2"
+                      style={{ border: `1px solid ${C.line}`, opacity: a.status_override === "Closed" ? 0.6 : 1 }}>
+                      <div>
+                        <div className="text-sm font-medium" style={{ color: C.navy }}>{a.course_label}</div>
+                        <div className="text-xs mt-0.5" style={{ color: C.muted }}>
+                          已完 {completed} / 共 {a.total_lessons} 堂
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-bold"
+                          style={{ color: remaining > 0 ? C.navy : C.muted }}>{remaining}</div>
+                        <div className="text-xs" style={{ color: C.muted }}>剩餘</div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {accounts.filter((a) => a.student_id === modal.student.id).length === 0 && (
+                  <div className="text-sm" style={{ color: C.muted }}>尚無課程帳戶。</div>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Btn kind="ghost" size="sm" onClick={closeModal}>關閉</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CSV Modal */}
       {modal.kind === "csv" && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: "rgba(10,30,54,0.55)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
-        >
-          <div
-            className="w-full max-w-lg rounded-2xl p-5 md:p-6 space-y-4"
-            style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}
-          >
-            <h3 className="text-base font-semibold" style={{ color: C.navy }}>批次匯入學生(CSV)</h3>
+          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
+          <div className="w-full max-w-lg rounded-2xl p-5 md:p-6 space-y-4"
+            style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}>
+            <h3 className="text-base font-semibold" style={{ color: C.navy }}>批次匯入學生</h3>
             <CsvImportPanel
               onDone={(msg) => { showToast(msg, msg.includes("成功")); closeModal(); }}
               onCancel={closeModal}
@@ -620,15 +548,75 @@ export default function StudentsClient({ students, teachers, accounts, lessons }
         </div>
       )}
 
-      {/* Detail Modal */}
-      {modal.kind === "detail" && (
-        <DetailModal
-          student={modal.student}
-          accounts={accounts}
-          lessons={lessons}
-          teachers={teachers}
-          onClose={closeModal}
-        />
+      {/* #7 刪除第一階段:建議改結束 */}
+      {modal.kind === "confirm-delete-warn" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(10,30,54,0.55)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
+          <div className="w-full max-w-md rounded-2xl p-5 space-y-4"
+            style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}>
+            <h3 className="text-base font-semibold" style={{ color: C.amber }}>建議改用「結束」</h3>
+            <div className="text-sm whitespace-pre-line" style={{ color: C.text }}>
+              {(() => {
+                const s = modal.student;
+                const stuAccounts = accounts.filter((a) => a.student_id === s.id);
+                const completed = lessons.filter(
+                  (l) => l.student_id === s.id && l.is_active && l.status === "completed"
+                ).length;
+                return `「${s.zh_name}」有紀錄：${
+                  stuAccounts.length > 0 ? `
+· ${stuAccounts.length} 個帳戶` : ""
+                }${
+                  completed > 0 ? `
+· ${completed} 堂完課` : ""
+                }
+
+刪除會讓這些紀錄找不到對應學生,可能影響匯款統計和歷史查詢。
+
+建議直接把狀態改為「結束」:學生從主要清單消失,但紀錄完整可查。
+
+若真的要刪除,再按下方按鈕。`;
+              })()}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Btn kind="ghost" size="sm" onClick={closeModal}>取消</Btn>
+              <Btn kind="good" size="sm" onClick={() => {
+                handleStatusChange(modal.student, "Closed");
+                closeModal();
+              }}>改為結束</Btn>
+              <Btn kind="danger" size="sm"
+                onClick={() => setModal({ kind: "confirm-delete-final", student: modal.student })}>
+                繼續刪除
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* #7 刪除第二階段:最終確認 */}
+      {modal.kind === "confirm-delete-final" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(10,30,54,0.55)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
+          <div className="w-full max-w-sm rounded-2xl p-5 space-y-4"
+            style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}>
+            <h3 className="text-base font-semibold" style={{ color: C.red }}>
+              刪除學生 · 最後確認
+            </h3>
+            <p className="text-sm whitespace-pre-line" style={{ color: C.text }}>
+              {`即將刪除「${modal.student.zh_name}」。
+
+此動作不可復原。`}
+            </p>
+            <div className="flex justify-end gap-2">
+              <Btn kind="ghost" size="sm" onClick={closeModal}>取消</Btn>
+              <Btn kind="danger" size="sm" disabled={isPending}
+                onClick={() => handleDeleteFinal(modal.student)}>
+                {isPending ? "刪除中…" : "確認刪除"}
+              </Btn>
+            </div>
+          </div>
+        </div>
       )}
 
       {toast && <Toast msg={toast.msg} ok={toast.ok} />}

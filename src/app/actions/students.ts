@@ -75,6 +75,16 @@ export async function setStudentStatus(id: string, status: StudentStatus) {
   return { ok: true };
 }
 
+export async function deleteStudent(id: string) {
+  const supabase = createClient();
+  // 只刪 student 本身,不 cascade
+  // 孤兒 accounts/lessons 會被健康檢查抓到,由使用者決定清理
+  const { error } = await supabase.from("students").delete().eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/students");
+  return { ok: true };
+}
+
 export async function importStudentsCSV(rows: {
   zh_name: string;
   en_name?: string;

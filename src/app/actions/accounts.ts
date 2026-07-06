@@ -32,7 +32,6 @@ export interface OpenAccountInput {
 export async function openAccount(input: OpenAccountInput) {
   const supabase = createClient();
   const now = new Date().toISOString();
-
   const enrollmentId = uid("en");
   const { error: enErr } = await supabase.from("enrollments").insert({
     id: enrollmentId,
@@ -45,7 +44,6 @@ export async function openAccount(input: OpenAccountInput) {
     updated_at: now,
   });
   if (enErr) return { error: enErr.message };
-
   const accountId = uid("ac");
   const { error: acErr } = await supabase.from("accounts").insert({
     id: accountId,
@@ -69,7 +67,6 @@ export async function openAccount(input: OpenAccountInput) {
     await supabase.from("enrollments").delete().eq("id", enrollmentId);
     return { error: acErr.message };
   }
-
   revalidatePath("/accounts");
   return { ok: true, accountId };
 }
@@ -121,6 +118,24 @@ export async function deleteAccount(accountId: string) {
   return { ok: true };
 }
 
+export async function cleanupOrphanAccounts(data: {
+  accountIds: string[];
+  enrollmentIds: string[];
+}) {
+  if (!data.accountIds.length) return { ok: true, deleted: 0 };
+  const supabase = createClient();
+  await supabase.from("lessons").delete().in("account_id", data.accountIds);
+  await supabase.from("schedule_rules").delete().in("account_id", data.accountIds);
+  const { error } = await supabase.from("accounts").delete().in("id", data.accountIds);
+  if (error) return { error: error.message };
+  if (data.enrollmentIds.length) {
+    await supabase.from("enrollments").delete().in("id", data.enrollmentIds);
+  }
+  revalidatePath("/accounts");
+  revalidatePath("/");
+  return { ok: true, deleted: data.accountIds.length };
+}
+
 export async function bookFlexLesson(data: {
   account_id: string;
   student_id: string;
@@ -138,22 +153,11 @@ export async function bookFlexLesson(data: {
   };
 }) {
   const supabase = createClient();
-
-  // 1. 查現有課程
   const { data: existing } = await supabase
-    .from("lessons")
-    .select("id,date,time,class_type,is_active")
-    .eq("account_id", data.account_id);
-
+    .from("lessons").select("id,date,time,class_type,is_active").eq("account_id", data.account_id);
   const active = (existing || []).filter((l) => l.is_active);
-
-  // 2. 重複時間檢查
   const dup = active.find((l) => l.date === data.date && l.time === data.time);
-  if (dup) {
-    return { ok: false, error: "同日同時已有該帳戶的課程,請選其他時間。" };
-  }
-
-  // 3. 堂數上限檢查
+  if (dup) return { ok: false, error: "同日同時已有該帳戶的課程,請選其他時間。" };
   const generalCount = active.filter((l) => l.class_type === "general").length;
   if (generalCount >= data.total_lessons) {
     return {
@@ -162,8 +166,6 @@ export async function bookFlexLesson(data: {
 若想換時間,建議到「課程管理」取消某堂 → 選「加補課」會更順(自動處理堂數守恆)。`,
     };
   }
-
-  // 4. 建立課程
   const now = new Date().toISOString();
   const { error } = await supabase.from("lessons").insert({
     id: uid("ls"),
@@ -189,7 +191,6 @@ export async function bookFlexLesson(data: {
     updated_at: now,
   });
   if (error) return { ok: false, error: error.message };
-
   revalidatePath("/accounts");
   return { ok: true };
 }

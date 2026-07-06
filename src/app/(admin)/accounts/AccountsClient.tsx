@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import { C } from "@/lib/constants";
 import type {
   Account, Student, Teacher, Lesson, PriceRule,
@@ -412,7 +412,8 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [filterStudent, setFilterStudent] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
+  const [filterTab, setFilterTab] = useState<"active" | "closed" | "all">("active");
+  
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -422,16 +423,45 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
 
   const studentById = Object.fromEntries(students.map((s) => [s.id, s]));
 
+  // #8 孤兒帳戶
+  const orphanAccounts = useMemo(
+    () => accounts.filter((a) => !studentById[a.student_id]),
+    [accounts, studentById]
+  );
+
+  const handleCleanOrphans = () => {
+    startTransition(async () => {
+      const { cleanupOrphanAccounts } = await import("@/app/actions/accounts");
+      const res = await cleanupOrphanAccounts({
+        accountIds: orphanAccounts.map((a) => a.id),
+        enrollmentIds: orphanAccounts.map((a) => a.enrollment_id).filter(Boolean) as string[],
+      });
+      if (res.error) showToast(res.error, false);
+      else showToast(`已清理 ${res.deleted} 個孤兒帳戶`);
+    });
+  };
+
   const getCompleted = (accId: string) =>
     lessons.filter((l) => l.account_id === accId && l.is_active && l.status === "completed").length;
   const getRemaining = (acc: Account) => acc.total_lessons - getCompleted(acc.id);
   const getStatus = (acc: Account) => accountStatus(acc, lessons);
 
-  const filtered = accounts.filter((a) => {
-    const matchSt = !filterStudent || a.student_id === filterStudent;
-    const matchStatus = !filterStatus || getStatus(a) === filterStatus;
-    return matchSt && matchStatus;
-  });
+  const filtered = useMemo(() => {
+    let list = accounts;
+    if (filterStudent) list = list.filter((a) => a.student_id === filterStudent);
+    if (filterTab === "active") {
+      list = list.filter((a) => {
+        const s = getStatus(a);
+        return s === "Active" || s === "Trial";
+      });
+    } else if (filterTab === "closed") {
+      list = list.filter((a) => {
+        const s = getStatus(a);
+        return s === "Closed" || s === "Completed";
+      });
+    }
+    return list;
+  }, [accounts, filterStudent, filterTab]);
 
   const handleOpenAccount = (input: OpenAccountInput) => {
     startTransition(async () => {
@@ -494,30 +524,42 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
         <p>• <strong>刪除</strong>:會一併刪除所有關聯課程紀錄與排課規則,謹慎操作。</p>
       </PageIntro>
 
-      {/* 篩選 */}
-      <div className="flex flex-wrap gap-2">
-        <select
-          className="rounded-lg border px-3 py-2 text-sm"
+      {/* #8 孤兒帳戶警示 */}
+      {orphanAccounts.length > 0 && (
+        <div className="rounded-xl p-3 flex items-center gap-3 flex-wrap"
+          style={{ background: "#FEE2E2", border: "1px solid #FCA5A5" }}>
+          <span className="text-sm font-medium flex-1" style={{ color: "#B91C1C" }}>
+            ⚠ 發現 {orphanAccounts.length} 個帳戶的學生資料不見了(學生欄顯示「—」的原因)
+          </span>
+          <Btn kind="danger" size="sm" disabled={isPending} onClick={handleCleanOrphans}>
+            {isPending ? "清理中…" : "一鍵清理"}
+          </Btn>
+        </div>
+      )}
+
+      {/* #9 Filter tab + 學生篩選 */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="flex rounded-lg overflow-hidden" style={{ border: `1px solid ${C.line}` }}>
+          {([["active","進行中"],["closed","已結束"],["all","全部"]] as const).map(([v, label]) => (
+            <button key={v} onClick={() => setFilterTab(v)}
+              className="px-3 py-1.5 text-xs font-medium transition-colors"
+              style={{
+                background: filterTab === v ? C.navy : C.card,
+                color: filterTab === v ? "#fff" : C.muted,
+                borderRight: `1px solid ${C.line}`,
+              }}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <select className="rounded-lg border px-3 py-2 text-sm"
           style={{ borderColor: C.line, color: C.text }}
           value={filterStudent}
-          onChange={(e) => setFilterStudent(e.target.value)}
-        >
+          onChange={(e) => setFilterStudent(e.target.value)}>
           <option value="">全部學生</option>
           {students.map((s) => (
             <option key={s.id} value={s.id}>{s.zh_name}</option>
           ))}
-        </select>
-        <select
-          className="rounded-lg border px-3 py-2 text-sm"
-          style={{ borderColor: C.line, color: C.text }}
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-        >
-          <option value="">全部狀態</option>
-          <option value="Active">進行中</option>
-          <option value="Trial">試聽中</option>
-          <option value="Completed">已完課</option>
-          <option value="Closed">已結束</option>
         </select>
       </div>
 
@@ -570,7 +612,7 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
                   </Td>
                   <Td>
                     <div className="flex gap-1 flex-wrap">
-                      {st === "Trial" && (
+                      {st === "Trial" && getCompleted(acc.id) >= 1 && (
                         <Btn kind="gold" size="sm" onClick={() => setModal({ kind: "convert", account: acc })}>
                           轉正式
                         </Btn>
