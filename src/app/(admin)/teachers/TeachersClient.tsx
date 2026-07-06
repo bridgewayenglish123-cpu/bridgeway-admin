@@ -116,7 +116,7 @@ function TeacherForm({
                 checked={form.teacher_type === t}
                 onChange={() => set("teacher_type", t)}
               />
-              {t === "Hanne" ? "Hanne(主管)" : "其他老師"}
+              {t === "Hanne" ? "Hanne" : "其他老師"}
             </label>
           ))}
         </div>
@@ -323,7 +323,7 @@ export default function TeachersClient({ teachers, stats }: Props) {
 
       <PageIntro storageKey="teachers" title="老師管理 · 說明">
         <p>管理所有教師的基本資料、啟用狀態。</p>
-        <p>• <strong>Hanne</strong> 為主管角色,在截止日(2026-07-05)前的完課計入其抽成。截止日後的課程,抽成自動歸入 Lee。</p>
+        <p>• <strong>Hanne</strong> 為角色,在截止日(2026-07-05)前的完課計入其抽成。截止日後的課程,抽成自動歸入 Lee。</p>
         <p>• 停用老師不影響歷史課程紀錄,只是不會再出現在新排課的選項中。</p>
         <p>• 有課程紀錄或排課規則的老師無法直接刪除,請先停用。</p>
       </PageIntro>
@@ -336,7 +336,7 @@ export default function TeachersClient({ teachers, stats }: Props) {
         </Card>
       ) : (
         <>
-          {renderGroup(hanne, "Hanne(主管)")}
+          {renderGroup(hanne, "Hanne")}
           {renderGroup(others, "其他老師")}
         </>
       )}
