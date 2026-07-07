@@ -1,7 +1,6 @@
 "use client";
 
 import { C } from "@/lib/constants";
-import Btn from "@/components/ui/Btn";
 
 interface Props {
   count: number;
@@ -11,11 +10,10 @@ interface Props {
   isPending: boolean;
 }
 
-export default function BatchBar({ count, onComplete, onCancel,
- onClear, isPending }: Props) {
+export default function BatchBar({ count, onComplete, onCancel, onClear, isPending }: Props) {
   return (
     <div
-      className="sticky top-0 md:top-16 z-20 rounded-xl px-4 py-3 flex items-center justify-between flex-wrap gap-3"
+      className="sticky top-0 z-20 rounded-xl px-4 py-3 flex items-center justify-between flex-wrap gap-3"
       style={{
         background: C.navy,
         boxShadow: "0 4px 16px rgba(15,42,74,0.20)",
@@ -25,9 +23,14 @@ export default function BatchBar({ count, onComplete, onCancel,
         已選 <span style={{ color: C.goldSoft }}>{count}</span> 堂
       </div>
       <div className="flex gap-2 flex-wrap">
-        <Btn kind="ghost" size="sm" onClick={onClear} disabled={isPending}>
+        <button
+          onClick={onClear}
+          disabled={isPending}
+          className="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-80 disabled:opacity-40"
+          style={{ background: "transparent", color: "#fff", border: "1px solid rgba(255,255,255,0.4)" }}
+        >
           取消選取
-        </Btn>
+        </button>
         <button
           onClick={onCancel}
           disabled={isPending}
