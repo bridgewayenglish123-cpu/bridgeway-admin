@@ -306,13 +306,9 @@ function FlexLessonForm({
   const [isPending, startTransition] = useTransition();
 
   // 老師過濾:Hanne 帳戶只列 Hanne;Other 帳戶只列 Other
-  const filteredTeachers = teachers.filter(
-    (t) =>
-      t.active_status === "Active" &&
-      (account.teacher_type === "Hanne"
-        ? t.teacher_type === "Hanne"
-        : t.teacher_type === "Other")
-  );
+  // 彈性排課不限老師類型，只要 Active 都可以選
+  // (費用已凍結在 account.snapshot，不需要依 teacher_type 匹配)
+  const filteredTeachers = teachers.filter((t) => t.active_status === "Active");
 
   const completed = lessons.filter(
     (l) => l.account_id === account.id && l.is_active && l.status === "completed"
@@ -388,11 +384,7 @@ function FlexLessonForm({
             <option key={t.id} value={t.id}>{t.teacher_name}</option>
           ))}
         </select>
-        {filteredTeachers.length === 0 && (
-          <div className="text-xs mt-1" style={{ color: C.amber }}>
-            此帳戶類型({account.teacher_type})目前沒有啟用中的老師。
-          </div>
-        )}
+
       </div>
 
       {/* 日期 + 時間 */}
