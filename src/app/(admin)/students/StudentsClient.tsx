@@ -519,7 +519,7 @@ export default function StudentsClient({ students, teachers, accounts, lessons, 
       <div className="flex flex-wrap gap-2">
         <input
           className="rounded-lg border px-3 py-2 text-sm flex-1 min-w-40"
-          style={{ borderColor: C.line, color: C.text }}
+          style={{ borderColor: C.line, color: C.text, fontSize: 16 }}
           placeholder="搜尋姓名 / Email…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}

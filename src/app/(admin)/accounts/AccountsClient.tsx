@@ -835,7 +835,7 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
         >
           <div
             className="w-full max-w-md rounded-2xl p-5 md:p-6 space-y-4"
-            style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}
+            style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)", maxHeight: "92vh", overflowY: "auto" }}
           >
             <h3 className="text-base font-semibold" style={{ color: C.navy }}>彈性排課</h3>
             <FlexLessonForm

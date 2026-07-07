@@ -325,7 +325,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
         </div>
         <input
           className="rounded-lg border px-3 py-2 text-sm flex-1 min-w-32"
-          style={{ borderColor: C.line, color: C.text }}
+          style={{ borderColor: C.line, color: C.text, fontSize: 16 }}
           placeholder="搜尋學生 / 老師…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}

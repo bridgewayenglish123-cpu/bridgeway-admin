@@ -175,7 +175,7 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
                 key={d}
                 type="button"
                 onClick={() => toggleWeekday(d)}
-                className="w-10 h-10 rounded-lg text-sm font-medium transition-colors"
+                className="w-11 h-11 rounded-lg text-sm font-medium transition-colors"
                 style={{
                   background: weekdays.includes(d) ? C.navy : "#EAF0F6",
                   color: weekdays.includes(d) ? "#fff" : C.navy,

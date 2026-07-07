@@ -64,7 +64,7 @@ export default function CancelModal({ lesson, account, teachers, onDone, onError
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="w-full max-w-md rounded-2xl p-5 space-y-4"
+        className="w-full max-w-md rounded-2xl p-5 space-y-4 overflow-y-auto"
         style={{ background: "white", boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}
       >
         {step === "confirm" && (

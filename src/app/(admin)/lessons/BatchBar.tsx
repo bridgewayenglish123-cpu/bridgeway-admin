@@ -15,7 +15,7 @@ export default function BatchBar({ count, onComplete, onCancel,
  onClear, isPending }: Props) {
   return (
     <div
-      className="sticky top-0 z-20 rounded-xl px-4 py-3 flex items-center justify-between flex-wrap gap-3"
+      className="sticky top-0 md:top-16 z-20 rounded-xl px-4 py-3 flex items-center justify-between flex-wrap gap-3"
       style={{
         background: C.navy,
         boxShadow: "0 4px 16px rgba(15,42,74,0.20)",
