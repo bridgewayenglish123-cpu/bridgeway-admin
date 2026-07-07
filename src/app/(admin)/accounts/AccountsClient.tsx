@@ -106,7 +106,7 @@ function OpenAccountForm({
           lesson_count: rule.lesson_count,
           teacher_payout_ntd: rule.teacher_payout_ntd,
           hanne_share_ntd: rule.hanne_share_ntd,
-          lee_commission_ntd: rule.price_ntd - rule.teacher_payout_ntd - rule.hanne_share_ntd,
+          lee_commission_ntd: Math.round(rule.price_ntd / rule.lesson_count) - rule.teacher_payout_ntd - rule.hanne_share_ntd,
         }
       : { original_price_ntd: 0, lesson_count: lessonCount, teacher_payout_ntd: 0, hanne_share_ntd: 0, lee_commission_ntd: 0 };
 

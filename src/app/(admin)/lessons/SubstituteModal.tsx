@@ -88,7 +88,7 @@ export default function SubstituteModal({
         teacher_payout_ntd: selectedRule.teacher_payout_ntd,
         hanne_share_ntd: isPostHanneCutoff(sampleLesson.date) ? 0 : selectedRule.hanne_share_ntd,
         lee_commission_ntd:
-          (account.snapshot?.original_price_ntd || 0) -
+          Math.round((account.snapshot?.original_price_ntd || 0) / (account.snapshot?.lesson_count || 1)) -
           selectedRule.teacher_payout_ntd -
           (isPostHanneCutoff(sampleLesson.date) ? 0 : selectedRule.hanne_share_ntd),
       }
@@ -226,7 +226,7 @@ export default function SubstituteModal({
               </div>
             )}
             <div className="flex justify-between font-medium pt-0.5" style={{ borderTop: `1px solid ${C.line}`, color: C.green }}>
-              <span>Lee 淨收</span>
+              <span>Lee 淨收 / 這堂</span>
               <span>NT$ {money(effectiveLeeFromSnap(newSnapshot, sampleLesson.date))}</span>
             </div>
           </div>

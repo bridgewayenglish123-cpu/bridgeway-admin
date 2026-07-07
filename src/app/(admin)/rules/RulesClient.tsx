@@ -121,9 +121,9 @@ export default function RulesClient({ rules, usageCounts }: Props) {
             {rules.length === 0 ? "還沒有任何價格規則。" : "沒有符合條件的規則。"}
           </Empty>
         ) : (
-          <Table head={["代碼", "方案名稱", "老師類型", "時長", "計費", "堂數", "售價", "老師抽成", "Hanne 抽成", "Lee 利潤", "使用", "狀態", "操作"]}>
+          <Table head={["代碼", "方案名稱", "老師類型", "時長", "計費", "堂數", "售價", "老師抽成(每堂)", "Hanne 抽成(每堂)", "Lee 利潤(總)", "使用", "狀態", "操作"]}>
             {filtered.map((r) => {
-              const lee = r.price_ntd - r.teacher_payout_ntd - r.hanne_share_ntd;
+              const lee = r.price_ntd - (r.teacher_payout_ntd * r.lesson_count) - (r.hanne_share_ntd * r.lesson_count);
               const usage = usageCounts[r.price_rule_code] || 0;
               const isActive = r.active_status === "Active";
               return (

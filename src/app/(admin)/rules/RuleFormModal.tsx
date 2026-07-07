@@ -49,7 +49,8 @@ export default function RuleFormModal({ rule, onDone, onError, onClose }: Props)
   const price = parseInt(form.price_ntd) || 0;
   const payout = parseInt(form.teacher_payout_ntd) || 0;
   const hanne = parseInt(form.hanne_share_ntd) || 0;
-  const lee = price - payout - hanne;
+  const count = parseInt(form.lesson_count) || 1;
+  const lee = price - (payout * count) - (hanne * count);
 
   const canSave =
     form.price_rule_code.trim() &&
@@ -176,8 +177,8 @@ export default function RuleFormModal({ rule, onDone, onError, onClose }: Props)
 
         <div className="grid grid-cols-3 gap-3">
           <F label="售價 NTD" required>{inp("price_ntd", "e.g. 2700", "number")}</F>
-          <F label="老師抽成 NTD" required>{inp("teacher_payout_ntd", "e.g. 150", "number")}</F>
-          <F label="Hanne 抽成 NTD">{inp("hanne_share_ntd", "0", "number")}</F>
+          <F label="老師抽成 NTD(每堂)" required>{inp("teacher_payout_ntd", "e.g. 150", "number")}</F>
+          <F label="Hanne 抽成 NTD(每堂)">{inp("hanne_share_ntd", "0", "number")}</F>
         </div>
 
         {/* Lee 利潤自動顯示 */}
@@ -186,7 +187,7 @@ export default function RuleFormModal({ rule, onDone, onError, onClose }: Props)
           style={{ background: lee >= 0 ? C.greenSoft : C.redSoft }}
         >
           <span className="text-sm" style={{ color: lee >= 0 ? C.green : C.red }}>
-            Lee 利潤(自動計算)
+            Lee 利潤(總額,自動計算)
           </span>
           <span className="text-base font-bold" style={{ color: lee >= 0 ? C.green : C.red }}>
             NT$ {money(lee)}
