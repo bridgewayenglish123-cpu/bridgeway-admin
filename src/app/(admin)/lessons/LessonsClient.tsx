@@ -65,9 +65,7 @@ const CLASS_TYPE_TONE: Record<string, "gray" | "amber" | "navy"> = {
 };
 
 
-export default function LessonsClient(
-// router injected
-{ lessons, students, teachers, accounts, priceRules }: Props) {
+export default function LessonsClient({ lessons, students, teachers, accounts, priceRules, phpRate }: Props) {
   const [tab, setTab] = useState<Tab>("today");
   const [search, setSearch] = useState("");
   const [showCancelled, setShowCancelled] = useState(false);
