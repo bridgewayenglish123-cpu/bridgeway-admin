@@ -9,7 +9,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const lastBackupAt = meta?.last_backup_at || null;
 
   return (
-    <div className="min-h-screen flex" style={{ background: C.bg }}>
+    <div className="min-h-screen lg:flex" style={{ background: C.bg }}>
       <Sidebar lastBackupAt={lastBackupAt} />
       <main className="flex-1 min-w-0">
         <div className="max-w-6xl mx-auto p-3 md:p-5">{children}</div>
