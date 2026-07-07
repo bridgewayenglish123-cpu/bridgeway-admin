@@ -69,6 +69,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
   const [tab, setTab] = useState<Tab>("today");
   const [search, setSearch] = useState("");
   const [showCancelled, setShowCancelled] = useState(false);
+  const [onlyPending, setOnlyPending] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [modal, setModal] = useState<ModalState>({ kind: "none" });
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
@@ -103,9 +104,15 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
     let list = lessons.filter((l) => l.is_active);
     if (!showCancelled) list = list.filter((l) => l.status !== "cancelled");
 
-    if (tab === "today") list = list.filter((l) => l.date === today);
-    else if (tab === "week") list = list.filter((l) => l.date >= wk.start && l.date <= wk.end);
-    else if (tab === "overdue") list = list.filter((l) => l.status === "scheduled" && l.date < today);
+    if (tab === "today") {
+      list = list.filter((l) => l.date === today);
+      if (onlyPending) list = list.filter((l) => l.status === "scheduled");
+    } else if (tab === "week") {
+      list = list.filter((l) => l.date >= wk.start && l.date <= wk.end);
+      if (onlyPending) list = list.filter((l) => l.status === "scheduled");
+    } else if (tab === "overdue") {
+      list = list.filter((l) => l.status === "scheduled" && l.date < today);
+    }
 
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -125,7 +132,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
       if (a.date !== b.date) return a.date.localeCompare(b.date);
       return (a.time || "").localeCompare(b.time || "");
     });
-  }, [lessons, tab, search, showCancelled, today, wk, studentById, teacherById]);
+  }, [lessons, tab, search, showCancelled, onlyPending, today, wk, studentById, teacherById]);
 
 
   // 選取
@@ -311,7 +318,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
           {TABS.map((t) => (
             <button
               key={t.key}
-              onClick={() => { setTab(t.key); clearSelect(); }}
+              onClick={() => { setTab(t.key); clearSelect(); if (t.key === 'today' || t.key === 'week') setOnlyPending(true); }}
               className="px-3 py-2 text-xs font-medium transition-colors"
               style={{
                 background: tab === t.key ? C.navy : C.card,
@@ -330,6 +337,16 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        {(tab === "today" || tab === "week") && (
+          <label className="flex items-center gap-1.5 text-sm cursor-pointer" style={{ color: C.navy, fontWeight: onlyPending ? 500 : 400 }}>
+            <input
+              type="checkbox"
+              checked={onlyPending}
+              onChange={(e) => setOnlyPending(e.target.checked)}
+            />
+            只看待上
+          </label>
+        )}
         <label className="flex items-center gap-1.5 text-sm cursor-pointer" style={{ color: C.muted }}>
           <input
             type="checkbox"
