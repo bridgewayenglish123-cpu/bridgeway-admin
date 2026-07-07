@@ -90,13 +90,18 @@ export default function NextSteps({
       });
     }
 
-    // 4. 試聽完未轉正
+    // 4. 試聽完未轉正(completed >= 1 且尚無正式帳戶)
     const trialToConvert = accounts.filter((a) => {
-      if (!a.is_trial || a.status_override === "Closed") return false;
+      if (!a.is_trial) return false;
+      if (a.status_override === "Closed") return false;
       const { completed } = accountStats(a);
       if (completed < 1) return false;
+      // 已有進行中的正式帳戶則不提醒
       return !accounts.some(
-        (x) => x.student_id === a.student_id && !x.is_trial && x.status_override !== "Closed"
+        (x) =>
+          x.student_id === a.student_id &&
+          !x.is_trial &&
+          x.status_override !== "Closed"
       );
     });
     if (trialToConvert.length > 0) {

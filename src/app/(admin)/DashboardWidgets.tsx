@@ -41,16 +41,21 @@ export default function DashboardWidgets({ lessons, accounts, teachers }: Props)
   // ── 17a 試聽轉正率 ──────────────────────────────────────────────────────────
   const trialStats = useMemo(() => {
     const cutoff = fmt(new Date(Date.now() - 30 * 86400000));
-    const recentTrials = accounts.filter(
-      (a) => a.is_trial && a.start_lesson_date && a.start_lesson_date >= cutoff
-    );
+    // 試聽帳戶:30天內有完課
+    const recentTrials = accounts.filter((a) => {
+      if (!a.is_trial || a.status_override === "Closed") return false;
+      const hasRecentCompleted = lessons.some(
+        (l) => l.account_id === a.id && l.is_active && l.status === "completed" && l.date >= cutoff
+      );
+      return hasRecentCompleted;
+    });
+    // 已轉正:該學生有非試聽的進行中帳戶
     const converted = recentTrials.filter((trial) =>
       accounts.some(
         (a) =>
           a.student_id === trial.student_id &&
           !a.is_trial &&
-          a.start_lesson_date &&
-          a.start_lesson_date >= (trial.start_lesson_date || "")
+          a.status_override !== "Closed"
       )
     );
     return {

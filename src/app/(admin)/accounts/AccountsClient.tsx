@@ -615,6 +615,8 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
     } else if (filterTab === "closed") {
       list = list.filter((a) => {
         const s = getStatus(a);
+        // 試聽完課但未轉正的，留在進行中 tab 讓使用者處理
+        if (a.is_trial && s === "Completed") return false;
         return s === "Closed" || s === "Completed";
       });
     }
@@ -726,7 +728,7 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
       {/* #9 Filter tab + 學生篩選 */}
       <div className="flex flex-wrap gap-2 items-center">
         <div className="flex rounded-lg overflow-hidden" style={{ border: `1px solid ${C.line}` }}>
-          {([["active","進行中"],["closed","已結束"],["all","全部"]] as const).map(([v, label]) => (
+          {([["active","進行中 / 試聽"],["closed","已結束"],["all","全部"]] as const).map(([v, label]) => (
             <button key={v} onClick={() => setFilterTab(v)}
               className="px-3 py-1.5 text-xs font-medium transition-colors"
               style={{
@@ -808,7 +810,7 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
                   </Td>
                   <Td>
                     <div className="flex gap-1 flex-wrap">
-                      {st === "Trial" && getCompleted(acc.id) >= 1 && (
+                      {acc.is_trial && getCompleted(acc.id) >= 1 && st !== "Closed" && (
                         <Btn kind="gold" size="sm" onClick={() => convertTrialToFormal(acc)}>
                           轉正式
                         </Btn>
