@@ -4,15 +4,17 @@ import LessonsClient from "./LessonsClient";
 
 async function loadData() {
   const supabase = createClient();
-  const [lessonsRes, studentsRes, teachersRes, accountsRes, rulesRes] = await Promise.all([
+  const [lessonsRes, studentsRes, metaRes, teachersRes, accountsRes, rulesRes] = await Promise.all([
     supabase.from("lessons").select("*").order("date", { ascending: false }).order("time"),
     supabase.from("students").select("id,zh_name,en_name"),
+    supabase.from("app_meta").select("php_rate").eq("id", 1).single(),
     supabase.from("teachers").select("id,teacher_name,teacher_type,active_status"),
     supabase.from("accounts").select("id,student_id,course_label,teacher_type,course_family,duration_type,billing_type,snapshot"),
     supabase.from("price_rules").select("*").eq("active_status", "Active"),
   ]);
   return {
     lessons: (lessonsRes.data || []) as Lesson[],
+    phpRate: (typeof metaRes.data?.php_rate === "number" && metaRes.data.php_rate > 0 ? metaRes.data.php_rate : 1.8),
     students: (studentsRes.data || []) as Pick<Student, "id" | "zh_name" | "en_name">[],
     teachers: (teachersRes.data || []) as Pick<Teacher, "id" | "teacher_name" | "teacher_type" | "active_status">[],
     accounts: (accountsRes.data || []) as Pick<Account, "id" | "student_id" | "course_label" | "teacher_type" | "course_family" | "duration_type" | "billing_type" | "snapshot">[],

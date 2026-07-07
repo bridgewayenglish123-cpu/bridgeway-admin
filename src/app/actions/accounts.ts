@@ -72,12 +72,8 @@ export async function openAccount(input: OpenAccountInput) {
 }
 
 export async function convertTrialToFull(accountId: string, input: OpenAccountInput) {
-  const supabase = createClient();
-  const { error: closeErr } = await supabase
-    .from("accounts")
-    .update({ status_override: "Closed", updated_at: new Date().toISOString() })
-    .eq("id", accountId);
-  if (closeErr) return { error: closeErr.message };
+  // 不動試聽帳戶,只建立新的正式帳戶
+  // 試聽帳戶完課後 accountStatus 自然回傳 "Completed",不需要手動關閉
   return openAccount({ ...input, is_trial: false });
 }
 

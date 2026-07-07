@@ -25,7 +25,6 @@ const EMPTY = {
   price_ntd: "",
   teacher_payout_ntd: "",
   hanne_share_ntd: "0",
-  validity_days: "",
 };
 
 export default function RuleFormModal({ rule, onDone, onError, onClose }: Props) {
@@ -72,7 +71,7 @@ export default function RuleFormModal({ rule, onDone, onError, onClose }: Props)
         price_ntd: parseInt(form.price_ntd),
         teacher_payout_ntd: parseInt(form.teacher_payout_ntd),
         hanne_share_ntd: parseInt(form.hanne_share_ntd) || 0,
-        validity_days: form.validity_days ? parseInt(form.validity_days) : null,
+        validity_days: null,
       };
       const res = isEdit
         ? await updatePriceRule(rule.id, data)
@@ -180,8 +179,6 @@ export default function RuleFormModal({ rule, onDone, onError, onClose }: Props)
           <F label="老師抽成 NTD" required>{inp("teacher_payout_ntd", "e.g. 150", "number")}</F>
           <F label="Hanne 抽成 NTD">{inp("hanne_share_ntd", "0", "number")}</F>
         </div>
-
-        <F label="有效天數(選填)">{inp("validity_days", "e.g. 180", "number")}</F>
 
         {/* Lee 利潤自動顯示 */}
         <div

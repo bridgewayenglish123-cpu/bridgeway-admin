@@ -17,6 +17,7 @@ interface Props {
   account: PartialAccount;
   teachers: PartialTeacher[];
   priceRules: PriceRule[];
+  phpRate: number;
   onDone: (msg: string) => void;
   onError: (msg: string) => void;
   onClose: () => void;
@@ -29,7 +30,7 @@ function effectiveLeeFromSnap(snap: PayoutSnapshot, date: string): number {
 }
 
 export default function SubstituteModal({
-  lessons, account, teachers, priceRules, onDone, onError, onClose,
+  lessons, account, teachers, priceRules, phpRate, onDone, onError, onClose,
 }: Props) {
   const [newTeacherId, setNewTeacherId] = useState("");
   const [selectedRuleCode, setSelectedRuleCode] = useState("");
@@ -195,27 +196,39 @@ export default function SubstituteModal({
 
         {/* 新費率預覽 */}
         {newSnapshot && (
-          <div className="rounded-lg p-3 text-xs space-y-1" style={{ background: C.greenSoft, color: C.navy }}>
-            <div className="font-semibold mb-1" style={{ color: C.green }}>新費率預覽</div>
-            <div className="flex justify-between">
-              <span>老師薪資({newTeacher?.teacher_name})</span>
-              <span className="font-medium">NT$ {money(newSnapshot.teacher_payout_ntd)}</span>
+          <div className="rounded-lg p-3 text-xs space-y-1.5" style={{ background: C.greenSoft, color: C.navy }}>
+            <div className="font-semibold mb-1" style={{ color: C.green }}>
+              新費用結構(依 {newTeacher?.teacher_type} 老師方案)
             </div>
-            {!isPostHanneCutoff(sampleLesson.date) && newSnapshot.hanne_share_ntd > 0 && (
+            <div className="flex justify-between">
+              <span>學生付</span>
+              <span className="font-medium">NT$ {money(account.snapshot?.original_price_ntd || 0)}(不變,依原帳戶)</span>
+            </div>
+            <div className="flex justify-between">
+              <span>代課老師抽成({newTeacher?.teacher_name})</span>
+              <span className="font-medium">
+                <span style={{ color: C.gold }}>₱ {money(Math.round(newSnapshot.teacher_payout_ntd * phpRate))}</span>
+                <span style={{ color: C.muted }}> (NT$ {money(newSnapshot.teacher_payout_ntd)}) / 這堂</span>
+              </span>
+            </div>
+            {!isPostHanneCutoff(sampleLesson.date) && newSnapshot.hanne_share_ntd > 0 ? (
               <div className="flex justify-between">
                 <span>Hanne 抽成</span>
-                <span>NT$ {money(newSnapshot.hanne_share_ntd)}</span>
+                <span>
+                  <span style={{ color: C.gold }}>₱ {money(Math.round(newSnapshot.hanne_share_ntd * phpRate))}</span>
+                  <span style={{ color: C.muted }}> (NT$ {money(newSnapshot.hanne_share_ntd)})</span>
+                </span>
+              </div>
+            ) : (
+              <div className="flex justify-between" style={{ color: C.muted }}>
+                <span>Hanne 抽成</span>
+                <span>₱ 0 (NT$ 0){isPostHanneCutoff(sampleLesson.date) ? " ※7/5 後歸 Lee" : ""}</span>
               </div>
             )}
-            <div className="flex justify-between font-medium" style={{ color: C.green }}>
-              <span>Lee 收入</span>
+            <div className="flex justify-between font-medium pt-0.5" style={{ borderTop: `1px solid ${C.line}`, color: C.green }}>
+              <span>Lee 淨收</span>
               <span>NT$ {money(effectiveLeeFromSnap(newSnapshot, sampleLesson.date))}</span>
             </div>
-            {isPostHanneCutoff(sampleLesson.date) && (
-              <div className="text-xs mt-1" style={{ color: C.muted }}>
-                ※ 此課程日期在 7/5 截止後,Hanne 抽成自動歸 Lee
-              </div>
-            )}
           </div>
         )}
 

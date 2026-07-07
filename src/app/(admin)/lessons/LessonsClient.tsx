@@ -37,6 +37,7 @@ interface Props {
   teachers: PartialTeacher[];
   accounts: PartialAccount[];
   priceRules: PriceRule[];
+  phpRate: number;
 }
 
 type ModalState =
@@ -546,6 +547,8 @@ export default function LessonsClient(
       {modal.kind === "cancel" && (
         <CancelModal
           lesson={modal.lesson}
+          account={accountById[modal.lesson.account_id]}
+          teachers={teachers}
           onDone={(msg) => { showToast(msg); closeModal(); }}
           onError={(msg) => showToast(msg, false)}
           onClose={closeModal}
@@ -557,6 +560,7 @@ export default function LessonsClient(
           account={modal.account}
           teachers={teachers}
           priceRules={priceRules}
+          phpRate={phpRate}
           onDone={(msg) => { showToast(msg); clearSelect(); closeModal(); }}
           onError={(msg) => showToast(msg, false)}
           onClose={closeModal}

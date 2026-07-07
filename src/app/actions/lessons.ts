@@ -53,7 +53,7 @@ export async function revertLessonToScheduled(lessonId: string) {
 // makeup = {date, time}  →  取消 + 建 makeup,讓延伸 inactive
 export async function cancelLesson(
   lessonId: string,
-  makeup: { date: string; time: string } | null = null
+  makeup: { date: string; time: string; teacherId?: string | null; note?: string | null } | null = null
 ) {
   const supabase = createClient();
   const now = new Date().toISOString();
@@ -105,7 +105,7 @@ export async function cancelLesson(
       id: uid("ls"),
       account_id: lesson.account_id,
       student_id: lesson.student_id,
-      teacher_id: lesson.teacher_id,
+      teacher_id: makeup.teacherId || lesson.teacher_id,
       schedule_rule_id: null,
       date: makeup.date,
       time: makeup.time,
@@ -119,7 +119,7 @@ export async function cancelLesson(
       is_substitute: false,
       original_teacher_id: null,
       payout_snapshot: lesson.payout_snapshot,
-      note: `補課(原課 ${lesson.date})`,
+      note: makeup.note || ("補課(原課 " + lesson.date + ")"),
       superseded: false,
       created_at: now,
       updated_at: now,
