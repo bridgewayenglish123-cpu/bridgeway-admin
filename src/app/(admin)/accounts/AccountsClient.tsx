@@ -204,13 +204,31 @@ function OpenAccountForm({
         </select>
       </div>
       {selectedRule && (
-        <div className="rounded-lg p-3 text-xs space-y-1" style={{ background: "#EAF0F6", color: C.navy }}>
-          <div className="flex justify-between"><span>課程費用</span><span className="font-medium">NT$ {money(selectedRule.price_ntd)}</span></div>
-          <div className="flex justify-between"><span>老師薪資</span><span>NT$ {money(selectedRule.teacher_payout_ntd)}</span></div>
-          <div className="flex justify-between"><span>Hanne 抽成</span><span>NT$ {money(selectedRule.hanne_share_ntd)}</span></div>
-          <div className="flex justify-between font-medium" style={{ color: C.green }}>
-            <span>Lee 收入</span>
-            <span>NT$ {money(selectedRule.price_ntd - selectedRule.teacher_payout_ntd - selectedRule.hanne_share_ntd)}</span>
+        <div className="rounded-lg p-3 text-xs space-y-1.5" style={{ background: "#EAF0F6", color: C.navy }}>
+          <div className="font-semibold mb-1" style={{ color: C.muted }}>凍結 snapshot 預覽</div>
+          <div className="flex justify-between">
+            <span>課程費用</span>
+            <span className="font-medium">NT$ {money(selectedRule.price_ntd)}</span>
+          </div>
+          <div>
+            <div className="flex justify-between">
+              <span>老師薪資(總額)</span>
+              <span>NT$ {money(selectedRule.teacher_payout_ntd * selectedRule.lesson_count)}</span>
+            </div>
+            <div style={{ color: C.muted }}>每堂 NT$ {money(selectedRule.teacher_payout_ntd)} × {selectedRule.lesson_count} 堂</div>
+          </div>
+          {selectedRule.hanne_share_ntd > 0 && (
+            <div>
+              <div className="flex justify-between">
+                <span>Hanne 抽成(總額)</span>
+                <span>NT$ {money(selectedRule.hanne_share_ntd * selectedRule.lesson_count)}</span>
+              </div>
+              <div style={{ color: C.muted }}>每堂 NT$ {money(selectedRule.hanne_share_ntd)} × {selectedRule.lesson_count} 堂</div>
+            </div>
+          )}
+          <div className="flex justify-between font-medium pt-0.5" style={{ borderTop: `1px solid rgba(15,42,74,0.12)`, color: C.green }}>
+            <span>Lee 收入(總額)</span>
+            <span>NT$ {money(selectedRule.price_ntd - (selectedRule.teacher_payout_ntd * selectedRule.lesson_count) - (selectedRule.hanne_share_ntd * selectedRule.lesson_count))}</span>
           </div>
         </div>
       )}
