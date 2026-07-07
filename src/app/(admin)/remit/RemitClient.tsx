@@ -12,6 +12,7 @@ import PeriodCard from "./PeriodCard";
 import HistoryCard from "./HistoryCard";
 import TotalsCard from "./TotalsCard";
 import ExtraModal from "./ExtraModal";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { updatePhpRate } from "@/app/actions/remit";
 
 interface Props {
@@ -128,6 +129,7 @@ export default function RemitClient({ teachers, accounts, lessons, periods, extr
   const [phpRate, setPhpRate] = useState(initPhpRate);
   const [rateInput, setRateInput] = useState(String(initPhpRate));
   const [ratePending, startRateTransition] = useTransition();
+  const { askConfirm } = useConfirm();
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [extraModal, setExtraModal] = useState<{ periodKey: string } | null>(null);
 

@@ -10,6 +10,7 @@ import type { Teacher, Account, Lesson, RemittancePeriod, RemittanceExtra } from
 import Card from "@/components/ui/Card";
 import Btn from "@/components/ui/Btn";
 import Badge from "@/components/ui/Badge";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { markPaid } from "@/app/actions/remit";
 
 interface Props {
@@ -93,6 +94,7 @@ function PeriodRow({
   onToast: (msg: string, ok?: boolean) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const { askConfirm } = useConfirm();
   const [isPending, startTransition] = useTransition();
 
   const p = periodOf(periodKey);
@@ -106,11 +108,24 @@ function PeriodRow({
   const isPaid = period?.paid || false;
 
   const handleToggle = () => {
-    startTransition(async () => {
-      const res = await markPaid(periodKey, !isPaid);
-      if (res.error) onToast(res.error, false);
-      else onToast(isPaid ? "已標記為未匯" : "已標記為已匯");
-    });
+    if (isPaid) {
+      askConfirm({
+        title: "撤銷已匯",
+        message: "即將把「" + p.label + "」的匯款狀態撤銷為「未匯」。\n\n若已實際匯款給老師,這個動作不會退錢,只影響系統顯示。",
+        confirmLabel: "確認撤銷",
+        onConfirm: async () => {
+          const res = await markPaid(periodKey, false);
+          if (res.error) onToast(res.error, false);
+          else onToast("已標記為未匯");
+        },
+      });
+    } else {
+      startTransition(async () => {
+        const res = await markPaid(periodKey, true);
+        if (res.error) onToast(res.error, false);
+        else onToast("已標記為已匯");
+      });
+    }
   };
 
   return (

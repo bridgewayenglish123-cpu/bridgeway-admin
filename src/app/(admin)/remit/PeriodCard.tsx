@@ -9,6 +9,7 @@ import type { Teacher, Account, Lesson, RemittancePeriod, RemittanceExtra } from
 import Btn from "@/components/ui/Btn";
 import Badge from "@/components/ui/Badge";
 import { Table, Td } from "@/components/ui/Table";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { markPaid, deleteExtra } from "@/app/actions/remit";
 
 interface Props {
@@ -25,11 +26,7 @@ interface Props {
 }
 
 export function TeacherBreakdownTable({
-  periodKey,
-  lessons,
-  teachers,
-  accountById,
-  phpRate,
+  periodKey, lessons, teachers, accountById, phpRate,
 }: {
   periodKey: string;
   lessons: Lesson[];
@@ -37,9 +34,7 @@ export function TeacherBreakdownTable({
   accountById: Record<string, Account>;
   phpRate: number;
 }) {
-  const { rows, totalPayoutNtd, lessonCount } = calcPeriodRows(
-    periodKey, lessons, teachers, accountById
-  );
+  const { rows, totalPayoutNtd, lessonCount } = calcPeriodRows(periodKey, lessons, teachers, accountById);
   const totalPhp = Math.round(totalPayoutNtd * phpRate);
 
   if (rows.length === 0) {
@@ -79,7 +74,7 @@ export default function PeriodCard({
   phpRate, isCurrent, onAddExtra, onToast,
 }: Props) {
   const [isPending, startTransition] = useTransition();
-  const [confirmDeleteId, setConfirmDeleteId] = useStateLocal<string | null>(null);
+  const { askConfirm } = useConfirm();
 
   const p = periodOf(periodKey);
   const { totalPayoutNtd, totalLeeNtd, lessonCount } = calcPeriodRows(
@@ -91,23 +86,44 @@ export default function PeriodCard({
   const totalNtd = totalPayoutNtd + extraNtd;
   const totalPhp = Math.round(totalNtd * phpRate);
   const basePhp = Math.round(totalPayoutNtd * phpRate);
-
   const isPaid = period?.paid || false;
   const teacherById = Object.fromEntries(teachers.map((t) => [t.id, t]));
 
+  // #27 撤銷已匯 confirm / 標記已匯直接執行
   const handleTogglePaid = () => {
-    startTransition(async () => {
-      const res = await markPaid(periodKey, !isPaid);
-      if (res.error) onToast(res.error, false);
-      else onToast(isPaid ? "已標記為未匯" : "已標記為已匯");
-    });
+    if (isPaid) {
+      askConfirm({
+        title: "撤銷已匯",
+        message: "即將把「" + p.label + "」的匯款狀態撤銷為「未匯」。\n\n若已實際匯款給老師,這個動作不會退錢,只影響系統顯示。",
+        confirmLabel: "確認撤銷",
+        onConfirm: async () => {
+          const res = await markPaid(periodKey, false);
+          if (res.error) onToast(res.error, false);
+          else onToast("已標記為未匯");
+        },
+      });
+    } else {
+      startTransition(async () => {
+        const res = await markPaid(periodKey, true);
+        if (res.error) onToast(res.error, false);
+        else onToast("已標記為已匯");
+      });
+    }
   };
 
-  const handleDeleteExtra = (id: string) => {
-    startTransition(async () => {
-      const res = await deleteExtra(id);
-      if (res.error) onToast(res.error, false);
-      else { onToast("已刪除額外費用"); setConfirmDeleteId(null); }
+  // #29 刪除額外費用 confirm
+  const handleDeleteExtra = (e: RemittanceExtra) => {
+    const tName = teacherById[e.teacher_id || ""]?.teacher_name || "整組共同";
+    askConfirm({
+      title: "刪除額外費用",
+      message: "即將刪除這筆額外費用:\n\n老師:" + tName + "\n金額:PHP " + e.amount_php + " / NTD " + e.amount_ntd + "\n說明:" + (e.note || "—") + "\n\n刪除後匯款總額會即時調整。",
+      confirmLabel: "確認刪除",
+      danger: true,
+      onConfirm: async () => {
+        const res = await deleteExtra(e.id);
+        if (res.error) onToast(res.error, false);
+        else onToast("已刪除額外費用");
+      },
     });
   };
 
@@ -146,7 +162,7 @@ export default function PeriodCard({
       </div>
 
       <div className="p-4 space-y-4">
-        {/* 金額摘要列 */}
+        {/* 金額摘要 */}
         <div className="flex items-center flex-wrap gap-4">
           {extras.length === 0 ? (
             <div className="text-sm" style={{ color: C.text }}>
@@ -202,22 +218,13 @@ export default function PeriodCard({
                 <div className="flex items-center gap-2">
                   <span style={{ color: C.gold }}>₱ {money(e.amount_php)}</span>
                   <span className="text-xs" style={{ color: C.muted }}>(NT$ {money(e.amount_ntd)})</span>
-                  {confirmDeleteId === e.id ? (
-                    <div className="flex gap-1">
-                      <Btn kind="ghost" size="sm" onClick={() => setConfirmDeleteId(null)}>取消</Btn>
-                      <Btn kind="danger" size="sm" disabled={isPending} onClick={() => handleDeleteExtra(e.id)}>
-                        確認刪除
-                      </Btn>
-                    </div>
-                  ) : (
-                    <button
-                      className="text-xs"
-                      style={{ color: C.red }}
-                      onClick={() => setConfirmDeleteId(e.id)}
-                    >
-                      刪除
-                    </button>
-                  )}
+                  <button
+                    className="text-xs"
+                    style={{ color: C.red }}
+                    onClick={() => handleDeleteExtra(e)}
+                  >
+                    刪除
+                  </button>
                 </div>
               </div>
             ))}
@@ -241,10 +248,4 @@ export default function PeriodCard({
       </div>
     </div>
   );
-}
-
-// 本地 useState helper(避免 import React 問題)
-function useStateLocal<T>(init: T): [T, (v: T) => void] {
-  const { useState } = require("react");
-  return useState(init);
 }

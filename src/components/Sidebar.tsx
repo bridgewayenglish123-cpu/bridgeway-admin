@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { C, TABS } from "@/lib/constants";
 
 interface SidebarProps {
@@ -41,11 +42,20 @@ export default function Sidebar({ lastBackupAt }: SidebarProps = {}) {
     }
   };
 
-  const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
+  const { askConfirm } = useConfirm();
+
+  const handleLogout = () => {
+    askConfirm({
+      title: "登出",
+      message: "即將登出系統。\n\n未儲存的變更會遺失(但目前所有操作都自動即時儲存)。",
+      confirmLabel: "確認登出",
+      onConfirm: async () => {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+        router.push("/login");
+        router.refresh();
+      },
+    });
   };
 
   const tabHrefFor = (key: string) => (key === "" ? "/" : `/${key}`);

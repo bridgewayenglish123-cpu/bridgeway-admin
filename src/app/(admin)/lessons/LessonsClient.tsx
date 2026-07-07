@@ -15,6 +15,7 @@ import Empty from "@/components/ui/Empty";
 import CancelModal from "./CancelModal";
 import SubstituteModal from "./SubstituteModal";
 import BatchBar from "./BatchBar";
+import { useConfirm } from "@/components/ConfirmProvider";
 import {
   markLessonCompleted,
   markLessonsCompleted,
@@ -42,8 +43,6 @@ type ModalState =
   | { kind: "none" }
   | { kind: "cancel"; lesson: Lesson }
   | { kind: "substitute"; lessons: Lesson[]; account: PartialAccount }
-  | { kind: "undo-sub"; lesson: Lesson }
-  | { kind: "batch-cancel"; lessons: Lesson[] }
 
 
 function Toast({ msg, ok }: { msg: string; ok: boolean }) {
@@ -75,6 +74,7 @@ export default function LessonsClient(
   const [modal, setModal] = useState<ModalState>({ kind: "none" });
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const router = useRouter();
+  const { askConfirm, askThreeWay } = useConfirm();
   const [isPending, startTransition] = useTransition();
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [noteEdit, setNoteEdit] = useState("");
@@ -198,35 +198,66 @@ export default function LessonsClient(
   };
 
   const handleRevert = (lessonId: string) => {
-    startTransition(async () => {
-      const res = await revertLessonToScheduled(lessonId);
-      if (res.error) showToast(res.error, false);
-      else showToast("已改回待上課");
+    const l = filtered.find((x) => x.id === lessonId);
+    if (!l) return;
+    askConfirm({
+      title: "改回待上",
+      message: "即將把 " + l.date + " " + (l.time || "") + " 的課程改回「待上」。\n\n若已計入本期匯款,撤銷後匯款金額會即時調整。",
+      confirmLabel: "確認改回",
+      onConfirm: async () => {
+        const res = await revertLessonToScheduled(lessonId);
+        if (res.error) showToast(res.error, false);
+        else showToast("已改回待上課");
+      },
     });
   };
 
   const handleBatchComplete = () => {
     const ids = [...selected];
-    startTransition(async () => {
-      const res = await markLessonsCompleted(ids);
-      if (res.error) showToast(res.error, false);
-      else { showToast(`已完成 ${ids.length} 堂`); clearSelect(); }
+    const count = ids.length;
+    askConfirm({
+      title: "批次標記完成",
+      message: "即將把已選 " + count + " 堂課程標記為完成。\n\n此動作可以個別用「↺ 改回待上」撤銷,但建議先確認選對了。",
+      confirmLabel: "確認批次完成",
+      onConfirm: async () => {
+        const res = await markLessonsCompleted(ids);
+        if (res.error) showToast(res.error, false);
+        else { showToast("已完成 " + count + " 堂"); clearSelect(); }
+      },
     });
   };
 
   const handleBatchCancel = () => {
-    setModal({ kind: "batch-cancel", lessons: selectedLessons });
+    const count = selectedLessons.length;
+    askConfirm({
+      title: "批次取消",
+      message: "即將取消已選 " + count + " 堂課程。\n\n每堂都會自動在 +7 天建立延伸課(維持堂數守恆)。\n若需指定補課日期,請改為單堂取消。",
+      confirmLabel: "確認批次取消",
+      danger: true,
+      onConfirm: async () => {
+        const res = await cancelLessons(selectedLessons.map((l) => l.id));
+        if (res.error) showToast(res.error, false);
+        else { showToast("已取消 " + count + " 堂,各自延伸 +7 天"); clearSelect(); }
+      },
+    });
   };
 
   const handleUndoSub = (lesson: Lesson) => {
-    setModal({ kind: "undo-sub", lesson });
+    handleUndoSubConfirm(lesson);
   };
 
-  const confirmUndoSub = (lesson: Lesson) => {
-    startTransition(async () => {
-      const res = await undoSubstitute(lesson.id);
-      if (res.error) showToast(res.error, false);
-      else { showToast("已撤銷代課"); closeModal(); }
+  const handleUndoSubConfirm = (lesson: Lesson) => {
+    const cur = teacherById[lesson.teacher_id || ""]?.teacher_name || "—";
+    const orig = teacherById[lesson.original_teacher_id || ""]?.teacher_name || "—";
+    askConfirm({
+      title: "撤銷代課",
+      message: "確定要撤銷這筆代課紀錄?\n\n目前老師:" + cur + "\n原老師:" + orig + "\n\n撤銷後老師會還原成 " + orig + ",費用結構也會還原成原本設定。",
+      confirmLabel: "確認撤銷",
+      onConfirm: async () => {
+        const res = await undoSubstitute(lesson.id);
+        if (res.error) showToast(res.error, false);
+        else { showToast("已撤銷代課"); closeModal(); }
+      },
     });
   };
 
@@ -520,41 +551,6 @@ export default function LessonsClient(
           onClose={closeModal}
         />
       )}
-
-      {modal.kind === "batch-cancel" && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(10,30,54,0.55)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
-        >
-          <div className="w-full max-w-sm rounded-2xl p-5 space-y-4" style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}>
-            <h3 className="text-base font-semibold" style={{ color: C.navy }}>
-              批次取消 {modal.lessons.length} 堂課？
-            </h3>
-            <div className="rounded-lg p-3 text-sm" style={{ background: C.amberSoft, color: C.amber }}>
-              每堂都會自動在 +7 天建立延伸課。若需指定補課日期,請改為單堂取消。
-            </div>
-            <div className="flex justify-end gap-2">
-              <Btn kind="ghost" size="sm" onClick={closeModal}>取消</Btn>
-              <Btn
-                kind="danger"
-                size="sm"
-                disabled={isPending}
-                onClick={() => {
-                  startTransition(async () => {
-                    const res = await cancelLessons(modal.lessons.map((l) => l.id));
-                    if (res.error) showToast(res.error, false);
-                    else { showToast(`已取消 ${modal.lessons.length} 堂,各自延伸 +7 天`); clearSelect(); closeModal(); }
-                  });
-                }}
-              >
-                {isPending ? "處理中…" : `確認取消 ${modal.lessons.length} 堂`}
-              </Btn>
-            </div>
-          </div>
-        </div>
-      )}
-
       {modal.kind === "substitute" && (
         <SubstituteModal
           lessons={modal.lessons}
@@ -566,33 +562,6 @@ export default function LessonsClient(
           onClose={closeModal}
         />
       )}
-
-      {modal.kind === "undo-sub" && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(10,30,54,0.55)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
-        >
-          <div className="w-full max-w-sm rounded-2xl p-5 space-y-4" style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}>
-            <h3 className="text-base font-semibold" style={{ color: C.navy }}>撤銷代課？</h3>
-            <div className="text-sm whitespace-pre-line" style={{ color: C.text }}>
-              {`確定要撤銷這筆代課紀錄?
-
-目前老師:${teacherById[modal.lesson.teacher_id || ""]?.teacher_name || "—"}
-原老師:${teacherById[modal.lesson.original_teacher_id || ""]?.teacher_name || "—"}
-
-撤銷後老師與費用結構會還原成原本設定。`}
-            </div>
-            <div className="flex justify-end gap-2">
-              <Btn kind="ghost" size="sm" onClick={closeModal}>取消</Btn>
-              <Btn kind="danger" size="sm" disabled={isPending} onClick={() => confirmUndoSub(modal.lesson)}>
-                {isPending ? "處理中…" : "確認撤銷"}
-              </Btn>
-            </div>
-          </div>
-        </div>
-      )}
-
       {toast && <Toast msg={toast.msg} ok={toast.ok} />}
     </div>
   );
