@@ -92,7 +92,10 @@ function OpenAccountForm({
   const [note, setNote] = useState(prefillNote || "");
   const [manualLessons, setManualLessons] = useState("");
 
-  const activeStudents = students.filter((s) => s.status === "Active" || s.status === "Paused");
+  const activeStudents = useMemo(() => students
+    .filter((s) => s.status === "Active")
+    .sort((a, b) => b.created_at.localeCompare(a.created_at)),
+  [students]);
   const selectedRule = priceRules.find((r) => r.price_rule_code === ruleCode);
   const lessonCount = selectedRule ? selectedRule.lesson_count : parseInt(manualLessons) || 0;
   const canSave = studentId && (ruleCode || (courseLabel && lessonCount > 0));
@@ -138,7 +141,7 @@ function OpenAccountForm({
             value={studentId}
             onChange={(e) => setStudentId(e.target.value)}
           >
-            <option value="">— 選擇學生 —</option>
+            <option value="" disabled>選擇學生...</option>
             {activeStudents.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.zh_name}{s.en_name ? ` (${s.en_name})` : ""}

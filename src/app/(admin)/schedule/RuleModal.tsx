@@ -28,8 +28,14 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
 
   // 進行中帳戶
   const activeAccounts = useMemo(() =>
-    accounts.filter((a) => a.status_override !== "Closed" && !a.is_trial),
-    [accounts]
+    accounts.filter((a) => {
+      if (a.status_override === "Closed") return false;
+      const completed = lessons.filter(
+        (l) => l.account_id === a.id && l.is_active && l.status === "completed"
+      ).length;
+      return a.total_lessons - completed > 0;
+    }),
+    [accounts, lessons]
   );
 
   const getRemainingForAccount = (acc: Account) => {
@@ -135,7 +141,7 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
             onChange={(e) => handleAccountChange(e.target.value)}
             disabled={isEdit}
           >
-            <option value="">— 選擇帳戶 —</option>
+            <option value="" disabled>選擇帳戶...</option>
             {[...activeAccounts].sort((a,b) => {
               const sa = studentById[a.student_id]?.zh_name || "";
               const sb = studentById[b.student_id]?.zh_name || "";
@@ -161,7 +167,7 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
             value={teacherId}
             onChange={(e) => setTeacherId(e.target.value)}
           >
-            <option value="">— 未指定 —</option>
+            <option value="">— 未指定(選填) —</option>
             {[...filteredTeachers].sort((a,b) => a.teacher_name.localeCompare(b.teacher_name)).map((t) => (
               <option key={t.id} value={t.id}>{t.teacher_name}</option>
             ))}
