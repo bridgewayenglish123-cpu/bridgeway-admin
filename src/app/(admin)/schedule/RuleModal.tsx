@@ -136,7 +136,11 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
             disabled={isEdit}
           >
             <option value="">— 選擇帳戶 —</option>
-            {activeAccounts.map((a) => {
+            {[...activeAccounts].sort((a,b) => {
+              const sa = studentById[a.student_id]?.zh_name || "";
+              const sb = studentById[b.student_id]?.zh_name || "";
+              return sa.localeCompare(sb, "zh-TW");
+            }).map((a) => {
               const st = studentById[a.student_id];
               const remaining = getRemainingForAccount(a);
               return (
@@ -158,7 +162,7 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
             onChange={(e) => setTeacherId(e.target.value)}
           >
             <option value="">— 未指定 —</option>
-            {filteredTeachers.map((t) => (
+            {[...filteredTeachers].sort((a,b) => a.teacher_name.localeCompare(b.teacher_name)).map((t) => (
               <option key={t.id} value={t.id}>{t.teacher_name}</option>
             ))}
           </select>

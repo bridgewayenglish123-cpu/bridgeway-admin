@@ -139,7 +139,7 @@ export default function CancelModal({ lesson, account, teachers, onDone, onError
                 onChange={(e) => setMakeupTeacherId(e.target.value)}
               >
                 <option value="">— 同原老師 —</option>
-                {filteredTeachers.map((t) => (
+                {[...filteredTeachers].sort((a,b) => a.teacher_name.localeCompare(b.teacher_name)).map((t) => (
                   <option key={t.id} value={t.id}>{t.teacher_name}</option>
                 ))}
               </select>

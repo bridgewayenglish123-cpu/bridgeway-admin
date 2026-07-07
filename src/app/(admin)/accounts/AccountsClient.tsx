@@ -159,12 +159,45 @@ function OpenAccountForm({
             if (r && !courseLabel) setCourseLabel(r.display_name);
           }}
         >
-          <option value="">— 手動輸入 —</option>
-          {priceRules.map((r) => (
-            <option key={r.price_rule_code} value={r.price_rule_code}>
-              {r.display_name} · {r.lesson_count}堂 · NT${money(r.price_ntd)}
-            </option>
-          ))}
+          <option value="">⚙ 自訂方案(手動填寫)</option>
+          {(() => {
+            const orderMap: Record<string, number> = {
+              "Hanne_Trial25": 1, "Hanne_Short25": 2, "Hanne_Long55": 3,
+              "Other_Trial25": 4, "Other_Short25": 5, "Other_Long55": 6,
+            };
+            const sorted = [...priceRules].sort((a, b) => {
+              const ka = a.teacher_type + "_" + a.duration_type;
+              const kb = b.teacher_type + "_" + b.duration_type;
+              const oa = orderMap[ka] || 99;
+              const ob = orderMap[kb] || 99;
+              if (oa !== ob) return oa - ob;
+              return a.lesson_count - b.lesson_count;
+            });
+            const hanneRules = sorted.filter(r => r.teacher_type === "Hanne");
+            const otherRules = sorted.filter(r => r.teacher_type !== "Hanne");
+            return (
+              <>
+                {hanneRules.length > 0 && (
+                  <optgroup label="Hanne 老師">
+                    {hanneRules.map((r) => (
+                      <option key={r.price_rule_code} value={r.price_rule_code}>
+                        {r.display_name} · NT$ {money(r.price_ntd)}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {otherRules.length > 0 && (
+                  <optgroup label="其他老師">
+                    {otherRules.map((r) => (
+                      <option key={r.price_rule_code} value={r.price_rule_code}>
+                        {r.display_name} · NT$ {money(r.price_ntd)}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </>
+            );
+          })()}
         </select>
       </div>
       {selectedRule && (
@@ -330,7 +363,7 @@ function FlexLessonForm({
           onChange={(e) => setTeacherId(e.target.value)}
         >
           <option value="">— 選擇老師 —</option>
-          {filteredTeachers.map((t) => (
+          {[...filteredTeachers].sort((a,b) => a.teacher_name.localeCompare(b.teacher_name)).map((t) => (
             <option key={t.id} value={t.id}>{t.teacher_name}</option>
           ))}
         </select>

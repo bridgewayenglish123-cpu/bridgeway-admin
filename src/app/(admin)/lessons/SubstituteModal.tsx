@@ -146,7 +146,7 @@ export default function SubstituteModal({
             onChange={(e) => { setNewTeacherId(e.target.value); setSelectedRuleCode(""); }}
           >
             <option value="">— 選擇老師 —</option>
-            {availableTeachers.map((t) => (
+            {[...availableTeachers].sort((a,b) => a.teacher_name.localeCompare(b.teacher_name)).map((t) => (
               <option key={t.id} value={t.id}>
                 {t.teacher_name} ({t.teacher_type})
               </option>

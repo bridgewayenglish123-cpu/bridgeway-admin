@@ -276,7 +276,7 @@ ${wdLabels} ${rule.time}
           onChange={(e) => setFilterTeacher(e.target.value)}
         >
           <option value="">全部老師</option>
-          {teachers.map((t) => (
+          {[...teachers].sort((a,b) => a.teacher_name.localeCompare(b.teacher_name)).map((t) => (
             <option key={t.id} value={t.id}>{t.teacher_name}</option>
           ))}
         </select>

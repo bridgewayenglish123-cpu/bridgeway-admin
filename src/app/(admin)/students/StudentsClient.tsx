@@ -138,7 +138,7 @@ function StudentForm({
           value={form.current_teacher_id}
           onChange={(e) => set("current_teacher_id", e.target.value)}>
           <option value="">— 未指定 —</option>
-          {activeTeachers.map((t) => (
+          {[...activeTeachers].sort((a,b) => a.teacher_name.localeCompare(b.teacher_name)).map((t) => (
             <option key={t.id} value={t.id}>{t.teacher_name}</option>
           ))}
         </select>
@@ -540,7 +540,7 @@ export default function StudentsClient({ students, teachers, accounts, lessons, 
           value={filterTeacher}
           onChange={(e) => setFilterTeacher(e.target.value)}>
           <option value="">全部老師</option>
-          {teachers.map((t) => (
+          {[...teachers].sort((a,b) => a.teacher_name.localeCompare(b.teacher_name)).map((t) => (
             <option key={t.id} value={t.id}>{t.teacher_name}</option>
           ))}
         </select>
