@@ -94,7 +94,7 @@ function OpenAccountForm({
 
   const activeStudents = useMemo(() => students
     .filter((s) => s.status === "Active")
-    .sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    .sort((a, b) => a.zh_name.localeCompare(b.zh_name, "zh-TW")),
   [students]);
   const selectedRule = priceRules.find((r) => r.price_rule_code === ruleCode);
   const lessonCount = selectedRule ? selectedRule.lesson_count : parseInt(manualLessons) || 0;
