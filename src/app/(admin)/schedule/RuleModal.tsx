@@ -55,12 +55,12 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
   const selectedAccount = accounts.find((a) => a.id === accountId);
 
   // 老師過濾:依帳戶 teacher_type
-  const filteredTeachers = useMemo(() => {
-    if (!selectedAccount) return teachers.filter((t) => t.active_status === "Active");
-    return teachers.filter(
-      (t) => t.active_status === "Active" && t.teacher_type === selectedAccount.teacher_type
-    );
-  }, [selectedAccount, teachers]);
+  const filteredTeachers = useMemo(() =>
+    [...teachers]
+      .filter((t) => t.active_status === "Active")
+      .sort((a, b) => a.teacher_name.localeCompare(b.teacher_name)),
+    [teachers]
+  );
 
   // 切換週幾
   const toggleWeekday = (d: number) => {

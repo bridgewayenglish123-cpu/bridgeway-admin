@@ -30,11 +30,9 @@ export default function CancelModal({ lesson, account, teachers, onDone, onError
   const autoExtDate = addDays(lesson.date, 7);
 
   // 過濾老師:依帳戶類型
-  const filteredTeachers = teachers.filter(
-    (t) =>
-      t.active_status === "Active" &&
-      (!account || t.teacher_type === account.teacher_type)
-  );
+  const filteredTeachers = [...teachers]
+    .filter((t) => t.active_status === "Active")
+    .sort((a, b) => a.teacher_name.localeCompare(b.teacher_name));
 
   const handleCancelOnly = () => {
     startTransition(async () => {
