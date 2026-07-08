@@ -49,8 +49,6 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
   const [teacherId, setTeacherId] = useState(rule?.teacher_id || "");
   const [weekdays, setWeekdays] = useState<number[]>(rule?.weekdays || []);
   const [time, setTime] = useState(rule?.time || "");
-  const [startDate, setStartDate] = useState(rule?.start_date || "");
-  const [endDate, setEndDate] = useState(rule?.end_date || "");
   const [isPending, startTransition] = useTransition();
 
   const selectedAccount = accounts.find((a) => a.id === accountId);
@@ -93,8 +91,8 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
         weekdays,
         time,
         duration,
-        start_date: startDate || null,
-        end_date: endDate || null,
+        start_date: null,
+        end_date: null,
       };
 
       const res = isEdit
@@ -220,29 +218,7 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
           </div>
         </div>
 
-        {/* 期間 */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>開始日期(選填)</label>
-            <input
-              type="date"
-              className="w-full rounded-lg border px-3 py-2 text-sm"
-              style={{ borderColor: C.line, color: C.text }}
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>結束日期(選填)</label>
-            <input
-              type="date"
-              className="w-full rounded-lg border px-3 py-2 text-sm"
-              style={{ borderColor: C.line, color: C.text }}
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
-          </div>
-        </div>
+
 
         {/* 三顆按鈕 */}
         <div className="flex justify-end gap-2 pt-1">

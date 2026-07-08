@@ -165,18 +165,10 @@ export async function generateLessonsForAccount(accountId: string): Promise<{
     activeLessons.map((l) => l.date + "__" + l.time)
   );
 
-  // 決定開始日期
+  // 起始日:今天
   const today = todayYMD();
-  let startDate = today;
-  for (const rule of rules) {
-    if (rule.start_date && rule.start_date > startDate) {
-      startDate = rule.start_date;
-    }
-  }
+  const startDate = today;
 
-  // 決定結束日期上限
-  let endLimit = "";
-  if (account.valid_until) endLimit = account.valid_until;
 
   // 預先載入所有衝突資料(跨學生老師衝突)
   const { data: allLessonsForConflict } = await supabase
@@ -205,12 +197,8 @@ export async function generateLessonsForAccount(accountId: string): Promise<{
     const cursorDate = new Date(cursor + "T00:00:00");
     const weekday = cursorDate.getDay();
 
-    if (endLimit && cursor > endLimit) break;
-
-    // 找符合此日期的規則
+    // 找符合此日期的規則(只看週幾,不用日期範圍)
     const matchingRules = rules.filter((r) => {
-      if (r.end_date && cursor > r.end_date) return false;
-      if (r.start_date && cursor < r.start_date) return false;
       return (r.weekdays as number[]).includes(weekday);
     });
 

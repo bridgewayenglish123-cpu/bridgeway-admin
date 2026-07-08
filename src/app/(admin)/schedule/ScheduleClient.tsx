@@ -297,7 +297,7 @@ ${wdLabels} ${rule.time}
             {rules.length === 0 ? "還沒有任何排課規則。" : "沒有符合條件的規則。"}
           </Empty>
         ) : (
-          <Table head={["學生", "課程方案", "週幾 · 時間 · 時長", "老師", "期間", "狀態", "操作"]}>
+          <Table head={["學生", "課程方案", "週幾 · 時間", "老師", "狀態", "操作"]}>
             {filtered.map((rule) => {
               const acc = accountById[rule.account_id];
               const student = acc ? studentById[acc.student_id] : null;
@@ -354,11 +354,6 @@ ${wdLabels} ${rule.time}
                   <Td>
                     <span className="text-sm" style={{ color: C.text }}>
                       {teacher?.teacher_name || <span style={{ color: C.muted }}>—</span>}
-                    </span>
-                  </Td>
-                  <Td>
-                    <span className="text-xs" style={{ color: C.muted }}>
-                      {rule.start_date || "—"} ~ {rule.end_date || "無限期"}
                     </span>
                   </Td>
                   <Td>
