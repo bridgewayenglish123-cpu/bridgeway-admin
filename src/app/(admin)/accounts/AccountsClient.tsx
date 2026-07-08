@@ -777,10 +777,12 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
                     {student?.en_name && <div className="text-xs" style={{ color: C.muted }}>{student.en_name}</div>}
                   </Td>
                   <Td>
-                    <div className="text-sm" style={{ color: C.text }}>{acc.course_label}</div>
-                    <div className="text-xs mt-0.5" style={{ color: C.muted }}>
-                      {acc.duration_type === "Long55" ? "55分鐘" : acc.is_trial ? "試聽25分" : "25分鐘"}
-                      {" · "}NT$ {money(acc.snapshot?.original_price_ntd || 0)}
+                    <div className="text-sm font-medium" style={{ color: C.navy }}>{acc.course_label}</div>
+                    <div className="text-xs mt-0.5 flex gap-1.5 flex-wrap" style={{ color: C.muted }}>
+                      <span>{acc.is_trial ? "試聽" : acc.duration_type === "Long55" ? "55分" : "25分"}</span>
+                      <span>·</span>
+                      <span>NT$ {money(acc.snapshot?.original_price_ntd || 0)}</span>
+                      {acc.is_trial && <span style={{ color: C.gold }}>· 試聽</span>}
                     </div>
                   </Td>
                   <Td>

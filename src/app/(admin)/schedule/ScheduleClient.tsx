@@ -339,7 +339,14 @@ ${wdLabels} ${rule.time}
                     )}
                   </Td>
                   <Td>
-                    <div className="text-sm font-medium" style={{ color: C.navy }}>{wdLabels}</div>
+                    <div className="flex gap-1 flex-wrap mb-0.5">
+                      {(rule.weekdays as number[]).sort().map((d) => (
+                        <span key={d} className="text-xs px-1.5 py-0.5 rounded font-medium"
+                          style={{ background: "#EAF0F6", color: C.navy }}>
+                          {WD[d]}
+                        </span>
+                      ))}
+                    </div>
                     <div className="text-xs" style={{ color: C.muted }}>
                       {rule.time} · {rule.duration} 分
                     </div>

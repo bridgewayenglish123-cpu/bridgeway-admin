@@ -242,7 +242,7 @@ export default function TeachersClient({ teachers, stats }: Props) {
                   {t.notes && <div className="text-xs mt-0.5" style={{ color: C.muted }}>{t.notes}</div>}
                 </Td>
                 <Td>
-                  <span className="font-mono text-xs px-1.5 py-0.5 rounded" style={{ background: "#EAF0F6", color: C.navy }}>
+                  <span className="font-mono text-xs px-1.5 py-0.5 rounded" title="老師代碼" style={{ background: "#EAF0F6", color: C.navy }}>
                     {t.teacher_code || "—"}
                   </span>
                 </Td>

@@ -58,7 +58,7 @@ function Toast({ msg, ok }: { msg: string; ok: boolean }) {
 }
 
 const CLASS_TYPE_LABEL: Record<string, string> = {
-  general: "一般", makeup: "補課", extension: "延伸",
+  general: "一般", makeup: "補課", extension: "延伸", regular: "一般",
 };
 const CLASS_TYPE_TONE: Record<string, "gray" | "amber" | "navy"> = {
   general: "gray", makeup: "amber", extension: "navy",
@@ -428,9 +428,10 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
                     )}
                   </Td>
                   <Td>
-                    <span className="text-sm" style={{ color: l.date < today && isScheduled ? C.red : C.text }}>
-                      {l.date}
-                    </span>
+                    <div className="text-sm font-medium" style={{ color: l.date < today && isScheduled ? C.red : C.text }}>
+                      {l.date.slice(5).replace("-", "/")}
+                    </div>
+                    <div className="text-xs" style={{ color: C.muted }}>{l.date.slice(0,4)}</div>
                   </Td>
                   <Td>
                     <span className="text-sm" style={{ color: C.muted }}>{l.time || "—"}</span>

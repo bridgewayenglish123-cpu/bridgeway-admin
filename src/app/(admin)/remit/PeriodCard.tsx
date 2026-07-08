@@ -141,8 +141,9 @@ export default function PeriodCard({
           <h3 className="text-sm font-semibold" style={{ color: C.navy }}>
             {isCurrent ? "本期匯款" : ""}（{p.label}）
           </h3>
-          <div className="text-xs mt-0.5" style={{ color: C.muted }}>
-            建議匯款日 {p.remit}
+          <div className="text-xs mt-0.5">
+            建議匯款日{" "}
+            <span className="font-semibold" style={{ color: isPaid ? C.muted : C.gold }}>{p.remit}</span>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

@@ -212,7 +212,7 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>時長(分)</label>
+            <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>時長(分)(依帳戶自動帶入)</label>
             <div className="flex gap-3 pt-2">
               {[25, 55].map((d) => (
                 <label key={d} className="flex items-center gap-1.5 text-sm cursor-pointer" style={{ color: C.text }}>
