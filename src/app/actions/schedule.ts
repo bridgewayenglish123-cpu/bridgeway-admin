@@ -127,6 +127,7 @@ export async function createBatchScheduleRules(items: {
 export async function generateLessonsForAccount(accountId: string): Promise<{
   ok?: boolean;
   added?: number;
+  skipped?: string[];
   error?: string;
 }> {
   const supabase = createClient();
@@ -177,6 +178,22 @@ export async function generateLessonsForAccount(accountId: string): Promise<{
   let endLimit = "";
   if (account.valid_until) endLimit = account.valid_until;
 
+  // 預先載入所有衝突資料(跨學生老師衝突)
+  const { data: allLessonsForConflict } = await supabase
+    .from("lessons")
+    .select("id,student_id,teacher_id,date,time")
+    .eq("is_active", true);
+
+  // teacherBusy: teacher_id + date + time → 學生名
+  const teacherBusyMap = new Map<string, string>();
+  for (const l of allLessonsForConflict || []) {
+    if (l.teacher_id) {
+      teacherBusyMap.set(l.teacher_id + "__" + l.date + "__" + l.time, l.student_id);
+    }
+  }
+
+  const skipped: string[] = [];
+
   // 迭代日期生成
   const toInsert: object[] = [];
   let cursor = startDate;
@@ -202,7 +219,25 @@ export async function generateLessonsForAccount(accountId: string): Promise<{
       const key = cursor + "__" + rule.time;
       if (existingKeys.has(key)) continue;
 
+      // 同學生時段衝突 → 跳過
+      const studentKey = account.student_id + "__" + cursor + "__" + rule.time;
+      if (existingKeys.has("student__" + studentKey)) {
+        skipped.push(cursor + " " + rule.time + " (學生已有課)");
+        continue;
+      }
+
+      // 同老師時段衝突 → 跳過
+      if (rule.teacher_id) {
+        const teacherKey = rule.teacher_id + "__" + cursor + "__" + rule.time;
+        if (teacherBusyMap.has(teacherKey)) {
+          skipped.push(cursor + " " + rule.time + " (老師已有課)");
+          continue;
+        }
+        teacherBusyMap.set(teacherKey, account.student_id);
+      }
+
       existingKeys.add(key);
+      existingKeys.add("student__" + studentKey);
       toInsert.push({
         id: uid("ls"),
         account_id: accountId,
@@ -256,7 +291,7 @@ export async function generateLessonsForAccount(accountId: string): Promise<{
   revalidatePath("/schedule");
   revalidatePath("/lessons");
   revalidatePath("/");
-  return { ok: true, added };
+  return { ok: true, added, skipped };
 }
 
 // ── 一次生成全部 ───────────────────────────────────────────────────────────────
