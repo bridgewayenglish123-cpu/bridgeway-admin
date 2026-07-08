@@ -165,9 +165,13 @@ export async function generateLessonsForAccount(accountId: string): Promise<{
     activeLessons.map((l) => l.date + "__" + l.time)
   );
 
-  // 起始日:今天
+  // 起始日:取各規則 start_date 的最早值，若無則從今天
   const today = todayYMD();
-  const startDate = today;
+  const ruleStartDates = rules.map((r) => r.start_date).filter(Boolean) as string[];
+  const earliestRuleStart = ruleStartDates.length > 0
+    ? ruleStartDates.reduce((a, b) => a < b ? a : b)
+    : today;
+  const startDate = earliestRuleStart > today ? earliestRuleStart : today;
 
 
   // 預先載入所有衝突資料(跨學生老師衝突)

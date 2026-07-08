@@ -49,6 +49,7 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
   const [teacherId, setTeacherId] = useState(rule?.teacher_id || "");
   const [weekdays, setWeekdays] = useState<number[]>(rule?.weekdays || []);
   const [time, setTime] = useState(rule?.time || "");
+  const [startDate, setStartDate] = useState(rule?.start_date || "");
   const [isPending, startTransition] = useTransition();
 
   const selectedAccount = accounts.find((a) => a.id === accountId);
@@ -91,7 +92,7 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
         weekdays,
         time,
         duration,
-        start_date: null,
+        start_date: startDate || null,
         end_date: null,
       };
 
@@ -220,6 +221,20 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
         </div>
 
 
+
+        {/* 開始日期 */}
+        <div>
+          <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
+            開始日期(選填，留空從今天起)
+          </label>
+          <input
+            type="date"
+            className="w-full rounded-lg border px-3 py-2 text-sm"
+            style={{ borderColor: C.line, color: C.text }}
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+        </div>
 
         {/* 三顆按鈕 */}
         <div className="flex justify-end gap-2 pt-1">
