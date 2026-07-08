@@ -149,17 +149,66 @@ export async function bookFlexLesson(data: {
   };
 }) {
   const supabase = createClient();
+
+  // 1a. 同學生時段衝突(跨帳戶)
+  const { data: studentLessons } = await supabase
+    .from("lessons")
+    .select("id,account_id,teacher_id")
+    .eq("student_id", data.student_id)
+    .eq("is_active", true)
+    .eq("date", data.date)
+    .eq("time", data.time);
+
+  if (studentLessons && studentLessons.length > 0) {
+    const dup = studentLessons[0];
+    const { data: dupAcc } = await supabase
+      .from("accounts").select("course_label").eq("id", dup.account_id).single();
+    const { data: dupTeacher } = await supabase
+      .from("teachers").select("teacher_name").eq("id", dup.teacher_id || "").single();
+    return {
+      ok: false,
+      error: "此學生在 " + data.date + " " + data.time + " 已有另一堂課:\n" +
+        (dupAcc?.course_label || "另一帳戶") + " · " + (dupTeacher?.teacher_name || "未指派老師") +
+        "\n\n請換時間,或先取消原本那堂。",
+    };
+  }
+
+  // 1b. 同老師時段衝突
+  if (data.teacher_id) {
+    const { data: teacherLessons } = await supabase
+      .from("lessons")
+      .select("id,student_id")
+      .eq("teacher_id", data.teacher_id)
+      .eq("is_active", true)
+      .eq("date", data.date)
+      .eq("time", data.time);
+
+    if (teacherLessons && teacherLessons.length > 0) {
+      const tDup = teacherLessons[0];
+      const { data: dupStudent } = await supabase
+        .from("students").select("zh_name").eq("id", tDup.student_id).single();
+      const { data: teacher } = await supabase
+        .from("teachers").select("teacher_name").eq("id", data.teacher_id).single();
+      return {
+        ok: false,
+        error: (teacher?.teacher_name || "此老師") + " 在 " + data.date + " " + data.time + " 已排另一堂:\n" +
+          "學生:" + (dupStudent?.zh_name || "未知") +
+          "\n\n請換時間或換老師。",
+      };
+    }
+  }
+
+  // 2. 帳戶內既有課程
   const { data: existing } = await supabase
     .from("lessons").select("id,date,time,class_type,is_active").eq("account_id", data.account_id);
   const active = (existing || []).filter((l) => l.is_active);
-  const dup = active.find((l) => l.date === data.date && l.time === data.time);
-  if (dup) return { ok: false, error: "同日同時已有該帳戶的課程,請選其他時間。" };
+
+  // 3. 堂數上限
   const generalCount = active.filter((l) => l.class_type === "general").length;
   if (generalCount >= data.total_lessons) {
     return {
       ok: false,
-      error: `此帳戶已排滿 ${generalCount}/${data.total_lessons} 堂。
-若想換時間,建議到「課程管理」取消某堂 → 選「加補課」會更順(自動處理堂數守恆)。`,
+      error: "此帳戶已排滿 " + generalCount + "/" + data.total_lessons + " 堂。\n若想換時間,建議到「課程管理」取消某堂 → 選「加補課」會更順(自動處理堂數守恆)。",
     };
   }
   const now = new Date().toISOString();
