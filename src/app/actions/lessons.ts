@@ -73,6 +73,52 @@ export async function cancelLesson(
     .eq("id", lessonId);
   if (cancelErr) return { error: cancelErr.message };
 
+  // makeup 衝突預檢(在建立之前)
+  if (makeup) {
+    // 同學生時段衝突
+    const { data: studentConflict } = await supabase
+      .from("lessons")
+      .select("id,account_id,teacher_id")
+      .eq("student_id", lesson.student_id)
+      .eq("is_active", true)
+      .eq("date", makeup.date)
+      .eq("time", makeup.time);
+
+    if (studentConflict && studentConflict.length > 0) {
+      const conf = studentConflict[0];
+      const { data: confAcc } = await supabase
+        .from("accounts").select("course_label").eq("id", conf.account_id).single();
+      const { data: confTeacher } = await supabase
+        .from("teachers").select("teacher_name").eq("id", conf.teacher_id || "").single();
+      return {
+        error: `此學生在 ${makeup.date} ${makeup.time} 已有另一堂課:\n${confAcc?.course_label || "另一帳戶"} · ${confTeacher?.teacher_name || "未指派老師"}\n\n請換補課時間。`,
+      };
+    }
+
+    // 同老師時段衝突
+    const makeupTeacherId = makeup.teacherId || lesson.teacher_id;
+    if (makeupTeacherId) {
+      const { data: teacherConflict } = await supabase
+        .from("lessons")
+        .select("id,student_id")
+        .eq("teacher_id", makeupTeacherId)
+        .eq("is_active", true)
+        .eq("date", makeup.date)
+        .eq("time", makeup.time);
+
+      if (teacherConflict && teacherConflict.length > 0) {
+        const tConf = teacherConflict[0];
+        const { data: confStudent } = await supabase
+          .from("students").select("zh_name").eq("id", tConf.student_id).single();
+        const { data: teacher } = await supabase
+          .from("teachers").select("teacher_name").eq("id", makeupTeacherId).single();
+        return {
+          error: `${teacher?.teacher_name || "此老師"} 在 ${makeup.date} ${makeup.time} 已排另一堂:\n學生:${confStudent?.zh_name || "未知"}\n\n請換補課時間或換老師。`,
+        };
+      }
+    }
+  }
+
   if (!makeup) {
     // 建自動延伸
     const { error: extErr } = await supabase.from("lessons").insert({

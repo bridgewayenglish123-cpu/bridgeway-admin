@@ -332,7 +332,7 @@ function FlexLessonForm({
         total_lessons: account.total_lessons,
         snapshot: account.snapshot,
       });
-      if (!res.ok) {
+      if (!res.ok || res.error) {
         setStatus({ ok: false, msg: res.error || "排課失敗" });
       } else if (keepOpen) {
         setStatus({ ok: true, msg: `已排:${date} ${time}` });
@@ -362,11 +362,12 @@ function FlexLessonForm({
         <div
           className="rounded-lg p-3 text-sm whitespace-pre-line"
           style={{
-            background: status.ok ? C.greenSoft : C.redSoft,
-            color: status.ok ? C.green : C.red,
+            background: status.ok ? C.greenSoft : "#FEE2E2",
+            color: status.ok ? C.green : "#B91C1C",
+            border: status.ok ? "none" : "1px solid #FCA5A5",
           }}
         >
-          {status.ok ? "✅ " : "⚠ "}{status.msg}
+          {status.ok ? "✅ " : "⛔ "}{status.msg}
         </div>
       )}
 
@@ -432,7 +433,7 @@ function FlexLessonForm({
         <Btn
           kind="ghost"
           size="sm"
-          disabled={!canSubmit}
+          disabled={!canSubmit || (!!status && !status.ok)}
           onClick={() => doSave(true)}
         >
           {isPending ? "儲存中…" : "儲存並再排一堂"}
@@ -440,7 +441,7 @@ function FlexLessonForm({
         <Btn
           kind="gold"
           size="sm"
-          disabled={!canSubmit}
+          disabled={!canSubmit || (!!status && !status.ok)}
           onClick={() => doSave(false)}
         >
           {isPending ? "儲存中…" : "儲存並關閉"}

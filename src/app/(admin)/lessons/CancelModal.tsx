@@ -25,6 +25,7 @@ export default function CancelModal({ lesson, account, teachers, onDone, onError
   const [makeupTeacherId, setMakeupTeacherId] = useState(lesson.teacher_id || "");
   const [makeupNote, setMakeupNote] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [conflictError, setConflictError] = useState<string | null>(null);
 
   const autoExtDate = addDays(lesson.date, 7);
 
@@ -45,6 +46,7 @@ export default function CancelModal({ lesson, account, teachers, onDone, onError
 
   const handleCancelWithMakeup = () => {
     if (!makeupDate || !makeupTime) return;
+    setConflictError(null);
     startTransition(async () => {
       const res = await cancelLesson(lesson.id, {
         date: makeupDate,
@@ -52,8 +54,11 @@ export default function CancelModal({ lesson, account, teachers, onDone, onError
         teacherId: makeupTeacherId || lesson.teacher_id || null,
         note: makeupNote || null,
       });
-      if (res.error) onError(res.error);
-      else onDone("已取消,補課排到 " + makeupDate + " " + makeupTime);
+      if (res.error) {
+        setConflictError(res.error);
+      } else {
+        onDone("已取消,補課排到 " + makeupDate + " " + makeupTime);
+      }
     });
   };
 
@@ -113,7 +118,7 @@ export default function CancelModal({ lesson, account, teachers, onDone, onError
                   style={{ borderColor: C.line, color: C.text }}
                   value={makeupDate}
                   min={todayYMD()}
-                  onChange={(e) => setMakeupDate(e.target.value)}
+                  onChange={(e) => { setMakeupDate(e.target.value); setConflictError(null); }}
                 />
               </div>
               <div>
@@ -125,7 +130,7 @@ export default function CancelModal({ lesson, account, teachers, onDone, onError
                   className="w-full rounded-lg border px-3 py-2 text-sm"
                   style={{ borderColor: C.line, color: C.text }}
                   value={makeupTime}
-                  onChange={(e) => setMakeupTime(e.target.value)}
+                  onChange={(e) => { setMakeupTime(e.target.value); setConflictError(null); }}
                 />
               </div>
             </div>
@@ -160,12 +165,21 @@ export default function CancelModal({ lesson, account, teachers, onDone, onError
               補課建立後,原自動延伸課會被停用(堂數守恆)。
             </div>
 
+            {conflictError && (
+              <div
+                className="rounded-lg p-3 text-sm whitespace-pre-line"
+                style={{ background: "#FEE2E2", color: "#B91C1C", border: "1px solid #FCA5A5" }}
+              >
+                ⛔ {conflictError}
+              </div>
+            )}
+
             <div className="flex justify-end gap-2">
               <Btn kind="ghost" size="sm" onClick={() => setStep("confirm")}>← 返回</Btn>
               <Btn
                 kind="primary"
                 size="sm"
-                disabled={!makeupDate || !makeupTime || isPending}
+                disabled={!makeupDate || !makeupTime || isPending || !!conflictError}
                 onClick={handleCancelWithMakeup}
               >
                 {isPending ? "處理中…" : "確認取消並建立補課"}
