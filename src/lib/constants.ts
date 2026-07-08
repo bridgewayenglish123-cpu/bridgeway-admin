@@ -30,12 +30,12 @@ export const WD = ["日", "一", "二", "三", "四", "五", "六"];
 
 export const TABS = [
   { key: "", label: "儀表板" },
-  { key: "teachers", label: "老師管理" },
-  { key: "students", label: "學生管理" },
-  { key: "rules", label: "價格規則" },
+  { key: "lessons", label: "課程管理" },
   { key: "accounts", label: "學員課程" },
   { key: "schedule", label: "排課管理" },
-  { key: "lessons", label: "課程管理" },
+  { key: "students", label: "學生管理" },
+  { key: "teachers", label: "老師管理" },
+  { key: "rules", label: "價格規則" },
   { key: "remit", label: "匯款總覽" },
 ];
 
