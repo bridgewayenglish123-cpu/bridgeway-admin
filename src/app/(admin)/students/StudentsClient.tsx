@@ -593,7 +593,7 @@ export default function StudentsClient({ students, teachers, accounts, lessons, 
                 </Td>
                 <Td>
                   <div className="flex gap-1.5 flex-wrap">
-                    <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "detail", student: s })}>詳情</Btn>
+                    <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "detail", student: s })}>查看</Btn>
                     <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "edit", student: s })}>編輯</Btn>
                     <Btn kind="danger" size="sm" onClick={() => handleDeleteConfirm(s)}>刪除</Btn>
                   </div>

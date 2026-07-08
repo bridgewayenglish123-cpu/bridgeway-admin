@@ -685,7 +685,7 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
       <PageIntro storageKey="accounts" title="學員課程 · 說明">
         <p>管理每位學生的課程帳戶(開課紀錄)。</p>
         <p>• <strong>開課</strong>:選擇學生 + 價格方案,系統自動帶入 snapshot 金額。</p>
-        <p>• <strong>試聽轉正</strong>:點「轉正式」,舊試聽帳戶自動關閉,開立新正式帳戶。</p>
+        <p>• <strong>試聽轉正</strong>:試聽完 1 堂後「轉正式」按鈕出現,點了開立新正式帳戶(試聽帳戶保留不動)。</p>
         <p>• <strong>彈性排課</strong>:直接排定一堂課,「儲存並再排一堂」可連排不關 Modal。</p>
         <p>• <strong>刪除</strong>:會一併刪除所有關聯課程紀錄與排課規則,謹慎操作。</p>
       </PageIntro>
@@ -797,7 +797,7 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
                       )}
                       {(st === "Active" || st === "Trial") && (
                         <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "flex", account: acc })}>
-                          排課
+                          排一堂
                         </Btn>
                       )}
                       {st === "Active" && (

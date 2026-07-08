@@ -360,7 +360,7 @@ ${wdLabels} ${rule.time}
                     <div className="flex gap-1 flex-wrap">
                       {isActive && acc && (
                         <Btn kind="good" size="sm" disabled={isPending} onClick={() => handleGenerate(rule)}>
-                          生成
+                          生成排課
                         </Btn>
                       )}
                       <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "edit", rule })}>

@@ -272,7 +272,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
   const TABS: { key: Tab; label: string }[] = [
     { key: "today", label: `今日` },
     { key: "week", label: "本週" },
-    { key: "overdue", label: overdueCount > 0 ? `逾期待處理 (${overdueCount})` : "逾期待處理" },
+    { key: "overdue", label: overdueCount > 0 ? `逾期 (${overdueCount})` : "逾期" },
     { key: "all", label: "全部" },
   ];
 
@@ -547,7 +547,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
                       )}
                       {isCompleted && (
                         <Btn kind="ghost" size="sm" disabled={isPending} onClick={() => handleRevert(l.id)}>
-                          ↺ 改回待上
+                          ↺ 撤銷
                         </Btn>
                       )}
                       {l.is_substitute && !isCancelled && (
