@@ -297,11 +297,11 @@ function FlexLessonForm({
   lessons: PartialLesson[];
   onClose: () => void;
 }) {
-  const defaultDuration = account.duration_type === "Long55" ? 55 : 25;
+  const duration = account.duration_type === "Long55" ? 55 : 25;
+  const durationLabel = account.duration_type === "Long55" ? "55 分鐘" : "25 分鐘";
   const [teacherId, setTeacherId] = useState("");
   const [date, setDate] = useState(todayYMD());
   const [time, setTime] = useState("");
-  const [duration, setDuration] = useState(defaultDuration);
   const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -347,14 +347,12 @@ function FlexLessonForm({
     <div className="space-y-3">
       {/* 帳戶摘要 */}
       <div className="rounded-lg p-3 text-sm" style={{ background: "#EAF0F6", color: C.navy }}>
-        <strong>{account.course_label}</strong>
-        <span className="ml-2" style={{ color: C.muted }}>
-          剩餘{" "}
-          <span style={{ color: remaining > 0 ? C.green : C.red, fontWeight: 600 }}>
-            {remaining}
-          </span>
-          {" "}/ {account.total_lessons} 堂
-        </span>
+        <div className="font-semibold">{account.course_label}</div>
+        <div className="mt-0.5 flex gap-3 flex-wrap" style={{ color: C.muted }}>
+          <span>剩餘 <span style={{ color: remaining > 0 ? C.green : C.red, fontWeight: 600 }}>{remaining}</span> / {account.total_lessons} 堂</span>
+          <span>·</span>
+          <span>每堂 <strong style={{ color: C.navy }}>{durationLabel}</strong>(依帳戶自動)</span>
+        </div>
       </div>
 
       {/* 狀態訊息(成功/失敗) */}
@@ -409,19 +407,6 @@ function FlexLessonForm({
             value={time}
             onChange={(e) => { setTime(e.target.value); setStatus(null); }}
           />
-        </div>
-      </div>
-
-      {/* 時長 */}
-      <div>
-        <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>時長</label>
-        <div className="flex gap-4">
-          {[25, 55].map((d) => (
-            <label key={d} className="flex items-center gap-1.5 text-sm cursor-pointer" style={{ color: C.text }}>
-              <input type="radio" checked={duration === d} onChange={() => setDuration(d)} />
-              {d} 分鐘
-            </label>
-          ))}
         </div>
       </div>
 

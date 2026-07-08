@@ -49,7 +49,6 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
   const [teacherId, setTeacherId] = useState(rule?.teacher_id || "");
   const [weekdays, setWeekdays] = useState<number[]>(rule?.weekdays || []);
   const [time, setTime] = useState(rule?.time || "");
-  const [duration, setDuration] = useState(rule?.duration || 25);
   const [startDate, setStartDate] = useState(rule?.start_date || "");
   const [endDate, setEndDate] = useState(rule?.end_date || "");
   const [isPending, startTransition] = useTransition();
@@ -72,13 +71,15 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
   };
 
   // 帳戶選擇後自動帶入時長
+  const selectedAccount2 = accounts.find((a) => a.id === accountId);
+  const duration = selectedAccount2
+    ? selectedAccount2.duration_type === "Long55" ? 55 : 25
+    : (rule?.duration || 25);
+  const durationLabel = duration === 55 ? "55 分鐘" : "25 分鐘";
+
   const handleAccountChange = (id: string) => {
     setAccountId(id);
-    const acc = accounts.find((a) => a.id === id);
-    if (acc) {
-      setDuration(acc.duration_type === "Long55" ? 55 : 25);
-      setTeacherId("");
-    }
+    setTeacherId("");
   };
 
   const canSave = accountId && weekdays.length > 0 && time;
@@ -213,13 +214,8 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
           </div>
           <div>
             <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>時長(分)(依帳戶自動帶入)</label>
-            <div className="flex gap-3 pt-2">
-              {[25, 55].map((d) => (
-                <label key={d} className="flex items-center gap-1.5 text-sm cursor-pointer" style={{ color: C.text }}>
-                  <input type="radio" checked={duration === d} onChange={() => setDuration(d)} />
-                  {d} 分
-                </label>
-              ))}
+            <div className="rounded-lg px-3 py-2 text-sm font-medium" style={{ background: "#EAF0F6", color: C.navy }}>
+              {durationLabel}
             </div>
           </div>
         </div>
