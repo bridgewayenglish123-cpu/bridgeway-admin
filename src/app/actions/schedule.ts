@@ -336,3 +336,42 @@ export async function deleteOrphanRules(): Promise<{ ok?: boolean; deleted?: num
   revalidatePath("/schedule");
   return { ok: true, deleted: orphanIds.length };
 }
+
+// ── 清除待上課程並重新生成 ────────────────────────────────────────────────────
+export async function clearAndRegenerate(accountId: string): Promise<{
+  ok?: boolean;
+  deleted?: number;
+  added?: number;
+  error?: string;
+}> {
+  const supabase = createClient();
+
+  // 只刪除 scheduled(待上)的課程，不動已完成/已取消的
+  const { data: toDelete, error: fetchErr } = await supabase
+    .from("lessons")
+    .select("id")
+    .eq("account_id", accountId)
+    .eq("is_active", true)
+    .eq("status", "scheduled");
+
+  if (fetchErr) return { error: fetchErr.message };
+
+  const deleteIds = (toDelete || []).map((l) => l.id);
+
+  if (deleteIds.length > 0) {
+    const { error: delErr } = await supabase
+      .from("lessons")
+      .delete()
+      .in("id", deleteIds);
+    if (delErr) return { error: delErr.message };
+  }
+
+  // 重新生成
+  const genResult = await generateLessonsForAccount(accountId);
+  if (genResult.error) return { error: genResult.error };
+
+  revalidatePath("/schedule");
+  revalidatePath("/lessons");
+  revalidatePath("/");
+  return { ok: true, deleted: deleteIds.length, added: genResult.added || 0 };
+}

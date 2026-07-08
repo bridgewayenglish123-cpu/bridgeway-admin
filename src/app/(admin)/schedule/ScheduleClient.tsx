@@ -17,6 +17,7 @@ import {
   generateLessonsForAccount,
   generateAll,
   deleteOrphanRules,
+  clearAndRegenerate,
 } from "@/app/actions/schedule";
 
 type PartialStudent = Pick<Student, "id" | "zh_name" | "en_name" | "status">;
@@ -185,6 +186,25 @@ ${wdLabels} ${rule.time}
         const res = await generateAll();
         if (res.error) showToast(res.error, false);
         else showToast(`已掃描 ${res.accountCount} 個帳戶,新增 ${res.totalAdded} 堂課`);
+      },
+    });
+  };
+
+  const handleClearAndRegen = (rule: ScheduleRule) => {
+    const acc = accountById[rule.account_id];
+    const student = acc ? studentById[acc.student_id] : null;
+    const scheduled = lessons.filter(
+      (l) => l.account_id === rule.account_id && l.is_active && l.status === "scheduled"
+    ).length;
+    askConfirm({
+      title: "清除並重新生成",
+      message: "即將刪除「" + (student?.zh_name || "?") + " · " + (acc?.course_label || "?") + "」所有待上課程(" + scheduled + " 堂)\n\n然後依目前排課規則重新生成。\n\n已完成/已取消的課程不受影響。",
+      confirmLabel: "確認清除並重排",
+      danger: true,
+      onConfirm: async () => {
+        const res = await clearAndRegenerate(rule.account_id);
+        if (res.error) showToast(res.error, false);
+        else showToast("已刪除 " + res.deleted + " 堂，重新生成 " + res.added + " 堂");
       },
     });
   };
@@ -361,6 +381,11 @@ ${wdLabels} ${rule.time}
                       {isActive && acc && (
                         <Btn kind="good" size="sm" disabled={isPending} onClick={() => handleGenerate(rule)}>
                           生成排課
+                        </Btn>
+                      )}
+                      {isActive && acc && (
+                        <Btn kind="ghost" size="sm" disabled={isPending} onClick={() => handleClearAndRegen(rule)}>
+                          清除重排
                         </Btn>
                       )}
                       <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "edit", rule })}>
