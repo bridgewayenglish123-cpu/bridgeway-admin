@@ -462,7 +462,7 @@ function ExpandedRow({
             此帳戶尚無課程紀錄。到「排課管理」設定規則,或點「排課」手動加。
           </div>
         ) : (
-          <Table head={["日期", "時間", "老師", "類型", "狀態"]}>
+          <Table head={["日期", "時間", "老師", "類型", "時長", "狀態"]}>
             {accLessons.map((l) => (
               <tr key={l.id} style={{ borderBottom: `1px solid ${C.line}` }}>
                 <Td><span className="text-xs">{l.date}</span></Td>

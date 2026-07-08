@@ -230,10 +230,10 @@ ${wdLabels} ${rule.time}
 
       <PageIntro storageKey="schedule" title="排課管理 · 說明">
         <p>為每位學生設定每週固定時段,系統依規則自動生成課程。</p>
-        <p>• <strong>新增規則</strong>:選帳戶、老師、週幾、時間,儲存後點「生成」產出實際課程。</p>
-        <p>• <strong>一次生成全部</strong>:掃描所有生效帳戶,自動補齊剩餘堂數。</p>
-        <p>• <strong>批次排課</strong>:多位學生同一時段(團體課),一次建立多條規則。</p>
-        <p>• 停用規則不影響已生成的課程,只停止產出新課。</p>
+        <p>• <strong>新增規則</strong>:選帳戶、老師、週幾、時間。時長依帳戶自動決定,不用選。</p>
+        <p>• <strong>生成</strong>:從今天起依週幾排課,直到帳戶剩餘堂數填滿為止。衝突時段自動跳過。</p>
+        <p>• <strong>一次生成全部</strong>:掃描所有生效規則,批次補齊。</p>
+        <p>• 停用規則不影響已生成的課程。</p>
       </PageIntro>
 
       {/* 孤兒規則警示 */}
@@ -297,7 +297,7 @@ ${wdLabels} ${rule.time}
             {rules.length === 0 ? "還沒有任何排課規則。" : "沒有符合條件的規則。"}
           </Empty>
         ) : (
-          <Table head={["學生", "課程方案", "週幾 · 時間", "老師", "狀態", "操作"]}>
+          <Table head={["學生 · 課程", "週幾 · 時間 · 時長", "老師", "狀態", "操作"]}>
             {filtered.map((rule) => {
               const acc = accountById[rule.account_id];
               const student = acc ? studentById[acc.student_id] : null;
@@ -316,26 +316,21 @@ ${wdLabels} ${rule.time}
                 >
                   <Td>
                     {student ? (
-                      <>
-                        <div className="font-medium" style={{ color: C.navy }}>{student.zh_name}</div>
-                        {student.en_name && (
-                          <div className="text-xs" style={{ color: C.muted }}>{student.en_name}</div>
+                      <div>
+                        <div className="font-medium" style={{ color: C.navy }}>
+                          {student.zh_name}
+                          {student.en_name && <span className="text-xs ml-1" style={{ color: C.muted }}>({student.en_name})</span>}
+                        </div>
+                        {acc ? (
+                          <div className="text-xs mt-0.5" style={{ color: remaining > 0 ? C.muted : C.red }}>
+                            {acc.course_label} · 剩 <span style={{ color: remaining > 0 && remaining <= 2 ? C.amber : remaining === 0 ? C.red : C.muted }}>{remaining}</span> 堂
+                          </div>
+                        ) : (
+                          <div className="text-xs" style={{ color: C.muted }}>—</div>
                         )}
-                      </>
+                      </div>
                     ) : (
                       <span style={{ color: C.red }}>— (帳戶不見)</span>
-                    )}
-                  </Td>
-                  <Td>
-                    {acc ? (
-                      <>
-                        <div className="text-sm" style={{ color: C.text }}>{acc.course_label}</div>
-                        <div className="text-xs" style={{ color: remaining > 0 ? C.green : C.muted }}>
-                          剩 {remaining} 堂
-                        </div>
-                      </>
-                    ) : (
-                      <span style={{ color: C.muted }}>—</span>
                     )}
                   </Td>
                   <Td>
@@ -348,7 +343,7 @@ ${wdLabels} ${rule.time}
                       ))}
                     </div>
                     <div className="text-xs" style={{ color: C.muted }}>
-                      {rule.time} · {rule.duration} 分
+                      {rule.time} · {rule.duration} 分鐘
                     </div>
                   </Td>
                   <Td>

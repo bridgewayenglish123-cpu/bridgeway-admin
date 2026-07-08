@@ -148,9 +148,10 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
             }).map((a) => {
               const st = studentById[a.student_id];
               const remaining = getRemainingForAccount(a);
+              const durLabel = a.duration_type === "Long55" ? "55分" : "25分";
               return (
                 <option key={a.id} value={a.id}>
-                  {st?.zh_name || "?"} · {a.course_label} · 剩 {remaining} 堂
+                  {st?.zh_name || "?"}{st?.en_name ? " (" + st.en_name + ")" : ""} · {durLabel} · 剩 {remaining} 堂
                 </option>
               );
             })}
