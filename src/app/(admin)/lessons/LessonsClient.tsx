@@ -112,6 +112,8 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
       if (onlyPending) list = list.filter((l) => l.status === "scheduled");
     } else if (tab === "overdue") {
       list = list.filter((l) => l.status === "scheduled" && l.date < today);
+    } else if (tab === "all") {
+      if (onlyPending) list = list.filter((l) => l.status === "scheduled");
     }
 
     if (search.trim()) {
@@ -318,7 +320,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
           {TABS.map((t) => (
             <button
               key={t.key}
-              onClick={() => { setTab(t.key); clearSelect(); if (t.key === 'today' || t.key === 'week') setOnlyPending(true); }}
+              onClick={() => { setTab(t.key); clearSelect(); if (t.key === 'today' || t.key === 'week' || t.key === 'all') setOnlyPending(true); }}
               className="px-3 py-2 text-xs font-medium transition-colors"
               style={{
                 background: tab === t.key ? C.navy : C.card,
@@ -337,7 +339,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        {(tab === "today" || tab === "week") && (
+        {(tab === "today" || tab === "week" || tab === "all") && (
           <label className="flex items-center gap-1.5 text-sm cursor-pointer" style={{ color: C.navy, fontWeight: onlyPending ? 500 : 400 }}>
             <input
               type="checkbox"
