@@ -34,7 +34,7 @@ export function TeacherBreakdownTable({
   accountById: Record<string, Account>;
   phpRate: number;
 }) {
-  const { rows, totalPayoutNtd, lessonCount } = calcPeriodRows(periodKey, lessons, teachers, accountById);
+  const { rows, totalPayoutNtd, hanneCommissionNtd, lessonCount } = calcPeriodRows(periodKey, lessons, teachers, accountById);
   const totalPhp = Math.round(totalPayoutNtd * phpRate);
 
   if (rows.length === 0) {
@@ -58,6 +58,15 @@ export function TeacherBreakdownTable({
           <Td><span style={{ color: C.gold }}>₱ {money(Math.round((r.payoutNtd + r.hanneNtd) * phpRate))}</span></Td>
         </tr>
       ))}
+      {hanneCommissionNtd > 0 && (
+        <tr style={{ borderBottom: `1px solid ${C.line}` }}>
+          <Td><span className="text-xs" style={{ color: C.amber }}>Hanne 佣金(來自其他老師課程)</span></Td>
+          <Td></Td><Td></Td><Td></Td>
+          <Td></Td>
+          <Td><span style={{ color: C.amber }}>NT$ {money(hanneCommissionNtd)}</span></Td>
+          <Td><span style={{ color: C.amber }}>₱ {money(Math.round(hanneCommissionNtd * phpRate))}</span></Td>
+        </tr>
+      )}
       <tr style={{ background: "#EAF0F6" }}>
         <Td><span className="font-semibold" style={{ color: C.navy }}>基本小計</span></Td>
         <Td></Td><Td></Td><Td></Td>
@@ -77,7 +86,7 @@ export default function PeriodCard({
   const { askConfirm } = useConfirm();
 
   const p = periodOf(periodKey);
-  const { totalPayoutNtd, totalLeeNtd, lessonCount } = calcPeriodRows(
+  const { totalPayoutNtd, totalLeeNtd, hanneCommissionNtd: _hc, lessonCount } = calcPeriodRows(
     periodKey, lessons, teachers, accountById
   );
 

@@ -65,12 +65,17 @@ export interface TeacherPeriodRow {
   leeNtd: number;
 }
 
+export interface HanneCommissionRow {
+  periodKey: string;
+  totalCommissionNtd: number;
+}
+
 export function calcPeriodRows(
   periodKey: string,
   lessons: Lesson[],
   teachers: Teacher[],
   accountById: Record<string, Account>
-): { rows: TeacherPeriodRow[]; totalPayoutNtd: number; totalLeeNtd: number; lessonCount: number; studentCount: number } {
+): { rows: TeacherPeriodRow[]; totalPayoutNtd: number; totalLeeNtd: number; hanneCommissionNtd: number; lessonCount: number; studentCount: number } {
   const period = periodOf(periodKey);
   const periodLessons = lessons.filter(
     (l) =>
@@ -99,7 +104,13 @@ export function calcPeriodRows(
     else row.l55++;
     row.total++;
     row.payoutNtd += l.payout_snapshot?.teacher_payout_ntd || 0;
-    row.hanneNtd += effectiveHanneShare(l);
+    // hanneNtd 只計入 Hanne 老師自己的抽成(teacher_type=Hanne)
+    // Other 老師課程的 hanne_share 單獨匯總，不計入該老師應得
+    const snap = l.payout_snapshot || ({} as any);
+    const isHanneTeacher = teachers.find((t) => t.id === l.teacher_id)?.teacher_type === "Hanne";
+    if (isHanneTeacher) {
+      row.hanneNtd += effectiveHanneShare(l);
+    }
     row.leeNtd += effectiveLeeCommission(l);
   }
 
@@ -107,11 +118,20 @@ export function calcPeriodRows(
     a.teacherName.localeCompare(b.teacherName)
   );
 
-  const totalPayoutNtd = rows.reduce((s, r) => s + r.payoutNtd + r.hanneNtd, 0);
+  // Hanne 佣金 = Other 老師課程裡的 hanne_share(截止日前)
+  let hanneCommissionNtd = 0;
+  for (const l of periodLessons) {
+    const isOtherTeacher = teachers.find((t) => t.id === l.teacher_id)?.teacher_type !== "Hanne";
+    if (isOtherTeacher) {
+      hanneCommissionNtd += effectiveHanneShare(l);
+    }
+  }
+
+  const totalPayoutNtd = rows.reduce((s, r) => s + r.payoutNtd + r.hanneNtd, 0) + hanneCommissionNtd;
   const totalLeeNtd = rows.reduce((s, r) => s + r.leeNtd, 0);
   const studentCount = new Set(periodLessons.map((l) => l.student_id)).size;
 
-  return { rows, totalPayoutNtd, totalLeeNtd, lessonCount: periodLessons.length, studentCount };
+  return { rows, totalPayoutNtd, totalLeeNtd, hanneCommissionNtd, lessonCount: periodLessons.length, studentCount };
 }
 
 // ── 取得所有有課程的期別 ──────────────────────────────────────────────────────
