@@ -90,28 +90,26 @@ function OpenAccountForm({
   const [courseLabel, setCourseLabel] = useState("");
   const [paymentDate, setPaymentDate] = useState(todayYMD());
   const [note, setNote] = useState(prefillNote || "");
-  const [manualLessons, setManualLessons] = useState("");
 
   const activeStudents = useMemo(() => students
     .filter((s) => s.status === "Active")
     .sort((a, b) => a.zh_name.localeCompare(b.zh_name, "zh-TW")),
   [students]);
   const selectedRule = priceRules.find((r) => r.price_rule_code === ruleCode);
-  const lessonCount = selectedRule ? selectedRule.lesson_count : parseInt(manualLessons) || 0;
-  const canSave = studentId && (ruleCode || (courseLabel && lessonCount > 0));
+  const lessonCount = selectedRule ? selectedRule.lesson_count : 0;
+  const canSave = studentId && ruleCode && courseLabel;
 
   const handleSave = () => {
     if (!canSave) return;
     const rule = selectedRule;
-    const snapshot = rule
-      ? {
-          original_price_ntd: rule.price_ntd,
-          lesson_count: rule.lesson_count,
-          teacher_payout_ntd: rule.teacher_payout_ntd,
-          hanne_share_ntd: rule.hanne_share_ntd,
-          lee_commission_ntd: Math.round(rule.price_ntd / rule.lesson_count) - rule.teacher_payout_ntd - rule.hanne_share_ntd,
-        }
-      : { original_price_ntd: 0, lesson_count: lessonCount, teacher_payout_ntd: 0, hanne_share_ntd: 0, lee_commission_ntd: 0 };
+    if (!rule) return; // 防呆:一定要選 price_rule
+    const snapshot = {
+      original_price_ntd: rule.price_ntd,
+      lesson_count: rule.lesson_count,
+      teacher_payout_ntd: rule.teacher_payout_ntd,
+      hanne_share_ntd: rule.hanne_share_ntd,
+      lee_commission_ntd: Math.round(rule.price_ntd / rule.lesson_count) - rule.teacher_payout_ntd - rule.hanne_share_ntd,
+    };
 
     onSave({
       student_id: studentId,
@@ -162,7 +160,7 @@ function OpenAccountForm({
             if (r && !courseLabel) setCourseLabel(r.display_name);
           }}
         >
-          <option value="">⚙ 自訂方案(手動填寫)</option>
+          <option value="" disabled>請選擇價格方案...</option>
           {(() => {
             const orderMap: Record<string, number> = {
               "Hanne_Trial25": 1, "Hanne_Short25": 2, "Hanne_Long55": 3,
@@ -241,24 +239,9 @@ function OpenAccountForm({
           style={{ borderColor: C.line, color: C.text }}
           value={courseLabel}
           onChange={(e) => setCourseLabel(e.target.value)}
-          placeholder="e.g. 2024 春季 25分鐘 8堂"
+          placeholder="可自訂標籤，例：2026 春季課程"
         />
       </div>
-      {!selectedRule && (
-        <div>
-          <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
-            堂數 <span style={{ color: C.red }}>*</span>
-          </label>
-          <input
-            type="number" min={1}
-            className="w-full rounded-lg border px-3 py-2 text-sm"
-            style={{ borderColor: C.line, color: C.text }}
-            value={manualLessons}
-            onChange={(e) => setManualLessons(e.target.value)}
-            placeholder="e.g. 8"
-          />
-        </div>
-      )}
       <div>
         <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>收款日期</label>
         <input
