@@ -859,16 +859,25 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
                   </Td>
                   <Td>
                     <div className="flex gap-1 flex-wrap">
-                      {acc.is_trial && getCompleted(acc.id) >= 1 && st !== "Closed" && (
-                        <>
-                          <Btn kind="gold" size="sm" onClick={() => convertTrialToFormal(acc)}>
-                            轉正式
-                          </Btn>
-                          <Btn kind="ghost" size="sm" onClick={() => handleClose(acc)}>
-                            結束
-                          </Btn>
-                        </>
-                      )}
+                      {acc.is_trial && getCompleted(acc.id) >= 1 && st !== "Closed" && (() => {
+                        const hasFormal = accounts.some(
+                          a => a.student_id === acc.student_id &&
+                               !a.is_trial &&
+                               a.status_override !== "Closed"
+                        );
+                        return (
+                          <>
+                            {!hasFormal && (
+                              <Btn kind="gold" size="sm" onClick={() => convertTrialToFormal(acc)}>
+                                轉正式
+                              </Btn>
+                            )}
+                            <Btn kind="ghost" size="sm" onClick={() => handleClose(acc)}>
+                              結束
+                            </Btn>
+                          </>
+                        );
+                      })()}
                       {(st === "Active" || st === "Trial") && (
                         <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "flex", account: acc })}>
                           排一堂
