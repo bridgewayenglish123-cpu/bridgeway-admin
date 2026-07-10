@@ -71,7 +71,7 @@ const STATUS_TONE: Record<string, "green" | "gold" | "gray" | "navy"> = {
 
 // ── 開課表單 ──────────────────────────────────────────────────────────────────
 function OpenAccountForm({
-  students, teachers, priceRules, prefillStudentId,
+  students, teachers, priceRules, accounts, prefillStudentId,
   prefillRuleCode, prefillNote,
   onSave, onCancel, isPending,
 }: {
@@ -81,6 +81,7 @@ function OpenAccountForm({
   prefillStudentId?: string;
   prefillRuleCode?: string;
   prefillNote?: string;
+  accounts: Account[];
   onSave: (input: OpenAccountInput) => void;
   onCancel: () => void;
   isPending: boolean;
@@ -90,18 +91,62 @@ function OpenAccountForm({
   const [courseLabel, setCourseLabel] = useState("");
   const [paymentDate, setPaymentDate] = useState(todayYMD());
   const [note, setNote] = useState(prefillNote || "");
+  const [prevSnap, setPrevSnap] = useState<{
+    snapshot: { original_price_ntd: number; lesson_count: number; teacher_payout_ntd: number; hanne_share_ntd: number; lee_commission_ntd: number };
+    course_label: string;
+    ruleCode: string | null;
+  } | null>(null);
+  const [snapChoice, setSnapChoice] = useState<"prev" | "new" | null>(null);
 
   const activeStudents = useMemo(() => students
     .filter((s) => s.status === "Active")
     .sort((a, b) => a.zh_name.localeCompare(b.zh_name, "zh-TW")),
   [students]);
+
+  const handleStudentChange = (sid: string) => {
+    setStudentId(sid);
+    setSnapChoice(null);
+    setPrevSnap(null);
+    if (!sid) return;
+    // 找該學生最近一筆非試聽帳戶的 snapshot
+    const prevAcc = [...accounts]
+      .filter((a) => a.student_id === sid && !a.is_trial && a.snapshot?.teacher_payout_ntd)
+      .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
+      [0];
+    if (prevAcc?.snapshot) {
+      setPrevSnap({
+        snapshot: prevAcc.snapshot,
+        course_label: prevAcc.course_label,
+        ruleCode: null,
+      });
+    }
+  };
   const selectedRule = priceRules.find((r) => r.price_rule_code === ruleCode);
   const lessonCount = selectedRule ? selectedRule.lesson_count : 0;
-  const canSave = studentId && ruleCode && courseLabel;
+  const canSave = studentId && courseLabel && (snapChoice === "prev" ? !!prevSnap : !!ruleCode);
 
   const handleSave = () => {
     if (!canSave) return;
     const rule = selectedRule;
+    // 沿用舊 snapshot 或從 rule 計算
+    if (snapChoice === "prev" && prevSnap) {
+      // 沿用上次凍結價格，堂數從 rule 或手動
+      onSave({
+        student_id: studentId,
+        course_label: courseLabel || prevSnap.course_label,
+        teacher_type: (prevSnap.snapshot as any).teacher_type || "Other",
+        course_family: "General",
+        duration_type: "Short25",
+        billing_type: "Package",
+        total_lessons: parseInt(String(prevSnap.snapshot.lesson_count)) || 8,
+        is_trial: false,
+        price_rule_code: "",
+        payment_date: paymentDate,
+        note,
+        snapshot: prevSnap.snapshot,
+      });
+      return;
+    }
     if (!rule) return; // 防呆:一定要選 price_rule
     const snapshot = {
       original_price_ntd: rule.price_ntd,
@@ -137,7 +182,7 @@ function OpenAccountForm({
             className="w-full rounded-lg border px-3 py-2 text-sm"
             style={{ borderColor: C.line, color: C.text }}
             value={studentId}
-            onChange={(e) => setStudentId(e.target.value)}
+            onChange={(e) => handleStudentChange(e.target.value)}
           >
             <option value="" disabled>選擇學生...</option>
             {activeStudents.map((s) => (
@@ -148,7 +193,48 @@ function OpenAccountForm({
           </select>
         </div>
 
-      <div>
+      {/* 舊學員提示 */}
+      {prevSnap && snapChoice === null && (
+        <div className="rounded-xl p-4 space-y-3" style={{ background: "#FBF8EF", border: `1px solid rgba(194,153,47,0.3)` }}>
+          <div className="text-sm font-semibold" style={{ color: C.navy }}>
+            此學員有上次課程紀錄
+          </div>
+          <div className="text-xs" style={{ color: C.muted }}>
+            上次方案：{prevSnap.course_label}<br />
+            老師抽成：NT$ {money(prevSnap.snapshot.teacher_payout_ntd)}／堂 · 課程費用：NT$ {money(prevSnap.snapshot.original_price_ntd)}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSnapChoice("prev")}
+              className="flex-1 rounded-lg py-2 text-sm font-medium"
+              style={{ background: C.gold, color: "#fff" }}
+            >
+              沿用上次價格
+            </button>
+            <button
+              onClick={() => setSnapChoice("new")}
+              className="flex-1 rounded-lg py-2 text-sm font-medium"
+              style={{ background: "#EAF0F6", color: C.navy }}
+            >
+              用新價格規則
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 沿用上次：只填課程標籤 */}
+      {prevSnap && snapChoice === "prev" && (
+        <div className="rounded-lg p-3 text-xs space-y-1" style={{ background: "#EAF0F6", color: C.navy }}>
+          <div className="font-semibold mb-1">沿用上次凍結價格</div>
+          <div className="flex justify-between"><span>老師抽成／堂</span><span>NT$ {money(prevSnap.snapshot.teacher_payout_ntd)}</span></div>
+          <div className="flex justify-between"><span>課程費用</span><span>NT$ {money(prevSnap.snapshot.original_price_ntd)}</span></div>
+          <div className="flex justify-between font-medium" style={{ color: C.green }}>
+            <span>Lee 收入／堂</span><span>NT$ {money(prevSnap.snapshot.lee_commission_ntd)}</span>
+          </div>
+        </div>
+      )}
+
+      {(!prevSnap || snapChoice === "new") && <div>
         <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>價格方案</label>
         <select
           className="w-full rounded-lg border px-3 py-2 text-sm"
@@ -200,8 +286,8 @@ function OpenAccountForm({
             );
           })()}
         </select>
-      </div>
-      {selectedRule && (
+      </div>}
+      {(!prevSnap || snapChoice === "new") && selectedRule && (
         <div className="rounded-lg p-3 text-xs space-y-1.5" style={{ background: "#EAF0F6", color: C.navy }}>
           <div className="font-semibold mb-1" style={{ color: C.muted }}>凍結 snapshot 預覽</div>
           <div className="flex justify-between">
@@ -832,6 +918,7 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
               students={students}
               teachers={teachers}
               priceRules={priceRules}
+              accounts={accounts}
               prefillStudentId={convertPrefill?.studentId || modal.prefillStudentId}
               prefillRuleCode={convertPrefill?.ruleCode}
               prefillNote={convertPrefill?.note}
