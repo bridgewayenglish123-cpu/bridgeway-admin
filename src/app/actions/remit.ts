@@ -40,6 +40,16 @@ export async function addExtra(data: {
   const supabase = createClient();
   const now = new Date().toISOString();
   const amount_ntd = Math.round(data.amount_php / data.php_rate);
+
+  // 確保 remittance_periods 有對應記錄(外鍵約束)
+  const { error: periodErr } = await supabase
+    .from("remittance_periods")
+    .upsert(
+      { period_key: data.period_key, paid: false, created_at: now, updated_at: now },
+      { onConflict: "period_key", ignoreDuplicates: true }
+    );
+  if (periodErr) return { error: periodErr.message };
+
   const { error } = await supabase.from("remittance_extras").insert({
     id: uid("rx"),
     period_key: data.period_key,
