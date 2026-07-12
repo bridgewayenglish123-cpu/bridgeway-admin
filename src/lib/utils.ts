@@ -6,7 +6,14 @@ export const money = (n: number | null | undefined) =>
 export const uid = (p = "id") =>
   p + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
-export const todayYMD = () => fmt(new Date());
+export const todayYMD = () => {
+  // 強制用 UTC+8(台灣時間),避免 Vercel 伺服器 UTC 時區問題
+  const now = new Date();
+  const twOffset = 8 * 60; // 分鐘
+  const localOffset = now.getTimezoneOffset(); // 本地與 UTC 的差(分鐘,UTC+8 是 -480)
+  const twNow = new Date(now.getTime() + (twOffset + localOffset) * 60 * 1000);
+  return fmt(twNow);
+};
 
 export function fmt(d: Date): string {
   const y = d.getFullYear();
