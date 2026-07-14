@@ -9,7 +9,7 @@ async function loadData() {
     supabase.from("students").select("id,zh_name,en_name,current_teacher_id,status"),
     supabase.from("teachers").select("id,teacher_name,teacher_type,active_status"),
     supabase.from("lessons").select("id,account_id,student_id,teacher_id,date,time,duration,status,is_active,class_type"),
-    supabase.from("price_rules").select("*").eq("active_status", "Active").order("teacher_type").order("display_name"),
+    supabase.from("price_rules").select("*").order("teacher_type").order("display_name"),
   ]);
   return {
     accounts: (accountsRes.data || []) as Account[],

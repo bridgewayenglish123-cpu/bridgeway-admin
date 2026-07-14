@@ -100,6 +100,7 @@ function OpenAccountForm({
   } | null>(null);
   const [snapChoice, setSnapChoice] = useState<"prev" | "new" | null>(null);
   const [prevLessonCount, setPrevLessonCount] = useState<number>(8);
+  const [prevLessonRuleCode, setPrevLessonRuleCode] = useState<string>("");
 
   const activeStudents = useMemo(() => students
     .filter((s) => s.status === "Active")
@@ -110,6 +111,7 @@ function OpenAccountForm({
     setStudentId(sid);
     setSnapChoice(null);
     setPrevSnap(null);
+    setPrevLessonRuleCode("");
     if (!sid) return;
     // 找該學生最近一筆非試聽帳戶的 snapshot
     const prevAcc = [...accounts]
@@ -129,25 +131,25 @@ function OpenAccountForm({
   };
   const selectedRule = priceRules.find((r) => r.price_rule_code === ruleCode);
   const lessonCount = selectedRule ? selectedRule.lesson_count : 0;
-  const canSave = studentId && (snapChoice === "prev" ? !!prevSnap : (!!ruleCode && !!courseLabel));
+  const canSave = studentId && (snapChoice === "prev" ? (!!prevSnap && !!prevLessonRuleCode) : (!!ruleCode && !!courseLabel));
 
   const handleSave = () => {
     if (!canSave) return;
     const rule = selectedRule;
     // 沿用舊 snapshot 或從 rule 計算
-    if (snapChoice === "prev" && prevSnap) {
-      const perLessonPrice = Math.round(prevSnap.snapshot.original_price_ntd / prevSnap.snapshot.lesson_count);
-      const newTotalPrice = perLessonPrice * prevLessonCount;
+    if (snapChoice === "prev" && prevSnap && prevLessonRuleCode) {
+      const oldRule = priceRules.find(r => r.price_rule_code === prevLessonRuleCode);
+      if (!oldRule) return;
+      const perLesson = Math.round(oldRule.price_ntd / oldRule.lesson_count);
+      const lee = perLesson - oldRule.teacher_payout_ntd - oldRule.hanne_share_ntd;
       const newSnapshot = {
-        original_price_ntd: newTotalPrice,
-        lesson_count: prevLessonCount,
-        teacher_payout_ntd: prevSnap.snapshot.teacher_payout_ntd,
-        hanne_share_ntd: prevSnap.snapshot.hanne_share_ntd,
-        lee_commission_ntd: prevSnap.snapshot.lee_commission_ntd,
+        original_price_ntd: oldRule.price_ntd,
+        lesson_count: oldRule.lesson_count,
+        teacher_payout_ntd: oldRule.teacher_payout_ntd,
+        hanne_share_ntd: oldRule.hanne_share_ntd,
+        lee_commission_ntd: lee,
       };
-      const autoLabel = (prevSnap.teacher_type === "Hanne" ? "Hanne" : "其他老師") +
-        " " + (prevSnap.duration_type === "Long55" ? "完整課 55分" : prevSnap.duration_type === "Trial25" ? "試聽 25分" : "短課 25分") +
-        " " + prevLessonCount + "堂";
+      const autoLabel = oldRule.display_name.replace("(舊價)", "").trim();
       onSave({
         student_id: studentId,
         course_label: courseLabel || autoLabel,
@@ -155,9 +157,9 @@ function OpenAccountForm({
         course_family: "General",
         duration_type: prevSnap.duration_type as "Short25" | "Long55" | "Trial25",
         billing_type: "Package",
-        total_lessons: prevLessonCount,
+        total_lessons: oldRule.lesson_count,
         is_trial: false,
-        price_rule_code: "",
+        price_rule_code: prevLessonRuleCode,
         payment_date: paymentDate,
         note,
         snapshot: newSnapshot,
@@ -240,50 +242,65 @@ function OpenAccountForm({
       )}
 
       {/* 沿用上次：只填課程標籤 */}
-      {prevSnap && snapChoice === "prev" && (
-        <div className="space-y-3">
-          <div>
-            <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
-              這次購買堂數 <span style={{ color: C.red }}>*</span>
-            </label>
-            <div className="flex gap-2 flex-wrap">
-              {[1, 8, 16, 32].map((n) => {
-                const perLesson = prevSnap.snapshot.teacher_payout_ntd;
-                const totalPrice = Math.round(prevSnap.snapshot.original_price_ntd / prevSnap.snapshot.lesson_count) * n;
-                const leePerLesson = prevSnap.snapshot.lee_commission_ntd;
-                return (
-                  <button
-                    key={n}
-                    onClick={() => {
-                      setPrevLessonCount(n);
-                      const label = (prevSnap.teacher_type === "Hanne" ? "Hanne" : "其他老師") +
-                        " " + (prevSnap.duration_type === "Long55" ? "完整課 55分" : prevSnap.duration_type === "Trial25" ? "試聽 25分" : "短課 25分") +
-                        " " + n + "堂";
-                      setCourseLabel(label);
-                    }}
-                    className="px-3 py-2 rounded-lg text-xs font-medium border transition-colors"
-                    style={{
-                      background: prevLessonCount === n ? C.navy : "transparent",
-                      color: prevLessonCount === n ? "#fff" : C.navy,
-                      borderColor: C.navy,
-                    }}
-                  >
-                    {n} 堂 · NT$ {money(Math.round(prevSnap.snapshot.original_price_ntd / prevSnap.snapshot.lesson_count) * n)}
-                  </button>
-                );
-              })}
+      {prevSnap && snapChoice === "prev" && (() => {
+        // 過濾出舊價方案(_V1)且符合該學生 teacher_type + duration_type
+        const oldRules = priceRules.filter(r =>
+          r.price_rule_code.endsWith("_V1") &&
+          r.teacher_type === prevSnap.teacher_type &&
+          r.duration_type === prevSnap.duration_type
+        ).sort((a, b) => a.lesson_count - b.lesson_count);
+        return (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
+                選擇舊價格方案 <span style={{ color: C.red }}>*</span>
+              </label>
+              {oldRules.length > 0 ? (
+                <select
+                  className="w-full rounded-lg border px-3 py-2 text-sm"
+                  style={{ borderColor: C.line, color: C.text }}
+                  value={prevLessonRuleCode}
+                  onChange={(e) => {
+                    setPrevLessonRuleCode(e.target.value);
+                    const r = oldRules.find(r => r.price_rule_code === e.target.value);
+                    if (r) {
+                      setPrevLessonCount(r.lesson_count);
+                      setCourseLabel(r.display_name.replace("(舊價)", "").trim());
+                    }
+                  }}
+                >
+                  <option value="" disabled>選擇方案...</option>
+                  {oldRules.map(r => (
+                    <option key={r.price_rule_code} value={r.price_rule_code}>
+                      {r.display_name} · NT$ {money(r.price_ntd)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="text-xs py-2" style={{ color: C.amber }}>
+                  找不到對應的舊價方案，請選「用新價格規則」。
+                </div>
+              )}
             </div>
+            {prevLessonRuleCode && (() => {
+              const r = oldRules.find(r => r.price_rule_code === prevLessonRuleCode);
+              if (!r) return null;
+              const perLesson = Math.round(r.price_ntd / r.lesson_count);
+              const lee = perLesson - r.teacher_payout_ntd - r.hanne_share_ntd;
+              return (
+                <div className="rounded-lg p-3 text-xs space-y-1" style={{ background: "#EAF0F6", color: C.navy }}>
+                  <div className="font-semibold mb-1">凍結價格預覽(舊費率)</div>
+                  <div className="flex justify-between"><span>課程總費用</span><span>NT$ {money(r.price_ntd)}</span></div>
+                  <div className="flex justify-between"><span>老師抽成／堂</span><span>NT$ {money(r.teacher_payout_ntd)}</span></div>
+                  <div className="flex justify-between font-medium" style={{ color: C.green }}>
+                    <span>Lee 收入／堂</span><span>NT$ {money(lee)}</span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
-          <div className="rounded-lg p-3 text-xs space-y-1" style={{ background: "#EAF0F6", color: C.navy }}>
-            <div className="font-semibold mb-1">凍結價格預覽(沿用舊費率)</div>
-            <div className="flex justify-between"><span>老師抽成／堂</span><span>NT$ {money(prevSnap.snapshot.teacher_payout_ntd)}</span></div>
-            <div className="flex justify-between"><span>課程總費用</span><span>NT$ {money(Math.round(prevSnap.snapshot.original_price_ntd / prevSnap.snapshot.lesson_count) * prevLessonCount)}</span></div>
-            <div className="flex justify-between font-medium" style={{ color: C.green }}>
-              <span>Lee 收入／堂</span><span>NT$ {money(prevSnap.snapshot.lee_commission_ntd)}</span>
-            </div>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {(!prevSnap || snapChoice === "new") && <div>
         <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>價格方案</label>
