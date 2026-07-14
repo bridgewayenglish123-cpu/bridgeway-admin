@@ -95,8 +95,11 @@ function OpenAccountForm({
     snapshot: { original_price_ntd: number; lesson_count: number; teacher_payout_ntd: number; hanne_share_ntd: number; lee_commission_ntd: number };
     course_label: string;
     ruleCode: string | null;
+    teacher_type: string;
+    duration_type: string;
   } | null>(null);
   const [snapChoice, setSnapChoice] = useState<"prev" | "new" | null>(null);
+  const [prevLessonCount, setPrevLessonCount] = useState<number>(8);
 
   const activeStudents = useMemo(() => students
     .filter((s) => s.status === "Active")
@@ -118,32 +121,46 @@ function OpenAccountForm({
         snapshot: prevAcc.snapshot,
         course_label: prevAcc.course_label,
         ruleCode: null,
+        teacher_type: prevAcc.teacher_type || "Other",
+        duration_type: prevAcc.duration_type || "Short25",
       });
+      setPrevLessonCount(prevAcc.snapshot.lesson_count || 8);
     }
   };
   const selectedRule = priceRules.find((r) => r.price_rule_code === ruleCode);
   const lessonCount = selectedRule ? selectedRule.lesson_count : 0;
-  const canSave = studentId && courseLabel && (snapChoice === "prev" ? !!prevSnap : !!ruleCode);
+  const canSave = studentId && (snapChoice === "prev" ? !!prevSnap : (!!ruleCode && !!courseLabel));
 
   const handleSave = () => {
     if (!canSave) return;
     const rule = selectedRule;
     // 沿用舊 snapshot 或從 rule 計算
     if (snapChoice === "prev" && prevSnap) {
-      // 沿用上次凍結價格，堂數從 rule 或手動
+      const perLessonPrice = Math.round(prevSnap.snapshot.original_price_ntd / prevSnap.snapshot.lesson_count);
+      const newTotalPrice = perLessonPrice * prevLessonCount;
+      const newSnapshot = {
+        original_price_ntd: newTotalPrice,
+        lesson_count: prevLessonCount,
+        teacher_payout_ntd: prevSnap.snapshot.teacher_payout_ntd,
+        hanne_share_ntd: prevSnap.snapshot.hanne_share_ntd,
+        lee_commission_ntd: prevSnap.snapshot.lee_commission_ntd,
+      };
+      const autoLabel = (prevSnap.teacher_type === "Hanne" ? "Hanne" : "其他老師") +
+        " " + (prevSnap.duration_type === "Long55" ? "完整課 55分" : prevSnap.duration_type === "Trial25" ? "試聽 25分" : "短課 25分") +
+        " " + prevLessonCount + "堂";
       onSave({
         student_id: studentId,
-        course_label: courseLabel || prevSnap.course_label,
-        teacher_type: (prevSnap.snapshot as any).teacher_type || "Other",
+        course_label: courseLabel || autoLabel,
+        teacher_type: prevSnap.teacher_type as "Hanne" | "Other",
         course_family: "General",
-        duration_type: "Short25",
+        duration_type: prevSnap.duration_type as "Short25" | "Long55" | "Trial25",
         billing_type: "Package",
-        total_lessons: parseInt(String(prevSnap.snapshot.lesson_count)) || 8,
+        total_lessons: prevLessonCount,
         is_trial: false,
         price_rule_code: "",
         payment_date: paymentDate,
         note,
-        snapshot: prevSnap.snapshot,
+        snapshot: newSnapshot,
       });
       return;
     }
@@ -224,12 +241,46 @@ function OpenAccountForm({
 
       {/* 沿用上次：只填課程標籤 */}
       {prevSnap && snapChoice === "prev" && (
-        <div className="rounded-lg p-3 text-xs space-y-1" style={{ background: "#EAF0F6", color: C.navy }}>
-          <div className="font-semibold mb-1">沿用上次凍結價格</div>
-          <div className="flex justify-between"><span>老師抽成／堂</span><span>NT$ {money(prevSnap.snapshot.teacher_payout_ntd)}</span></div>
-          <div className="flex justify-between"><span>課程費用</span><span>NT$ {money(prevSnap.snapshot.original_price_ntd)}</span></div>
-          <div className="flex justify-between font-medium" style={{ color: C.green }}>
-            <span>Lee 收入／堂</span><span>NT$ {money(prevSnap.snapshot.lee_commission_ntd)}</span>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
+              這次購買堂數 <span style={{ color: C.red }}>*</span>
+            </label>
+            <div className="flex gap-2 flex-wrap">
+              {[1, 8, 16, 32].map((n) => {
+                const perLesson = prevSnap.snapshot.teacher_payout_ntd;
+                const totalPrice = Math.round(prevSnap.snapshot.original_price_ntd / prevSnap.snapshot.lesson_count) * n;
+                const leePerLesson = prevSnap.snapshot.lee_commission_ntd;
+                return (
+                  <button
+                    key={n}
+                    onClick={() => {
+                      setPrevLessonCount(n);
+                      const label = (prevSnap.teacher_type === "Hanne" ? "Hanne" : "其他老師") +
+                        " " + (prevSnap.duration_type === "Long55" ? "完整課 55分" : prevSnap.duration_type === "Trial25" ? "試聽 25分" : "短課 25分") +
+                        " " + n + "堂";
+                      setCourseLabel(label);
+                    }}
+                    className="px-3 py-2 rounded-lg text-xs font-medium border transition-colors"
+                    style={{
+                      background: prevLessonCount === n ? C.navy : "transparent",
+                      color: prevLessonCount === n ? "#fff" : C.navy,
+                      borderColor: C.navy,
+                    }}
+                  >
+                    {n} 堂 · NT$ {money(Math.round(prevSnap.snapshot.original_price_ntd / prevSnap.snapshot.lesson_count) * n)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="rounded-lg p-3 text-xs space-y-1" style={{ background: "#EAF0F6", color: C.navy }}>
+            <div className="font-semibold mb-1">凍結價格預覽(沿用舊費率)</div>
+            <div className="flex justify-between"><span>老師抽成／堂</span><span>NT$ {money(prevSnap.snapshot.teacher_payout_ntd)}</span></div>
+            <div className="flex justify-between"><span>課程總費用</span><span>NT$ {money(Math.round(prevSnap.snapshot.original_price_ntd / prevSnap.snapshot.lesson_count) * prevLessonCount)}</span></div>
+            <div className="flex justify-between font-medium" style={{ color: C.green }}>
+              <span>Lee 收入／堂</span><span>NT$ {money(prevSnap.snapshot.lee_commission_ntd)}</span>
+            </div>
           </div>
         </div>
       )}
