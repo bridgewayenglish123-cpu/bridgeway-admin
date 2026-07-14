@@ -68,6 +68,49 @@ export async function openAccount(input: OpenAccountInput) {
     return { error: acErr.message };
   }
   revalidatePath("/accounts");
+  // 自動複製舊帳戶排課規則到新帳戶
+  try {
+    const { data: prevAccounts } = await supabase
+      .from("accounts")
+      .select("id")
+      .eq("student_id", input.student_id)
+      .eq("is_trial", false)
+      .neq("id", accountId)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (prevAccounts && prevAccounts.length > 0) {
+      const prevAccId = prevAccounts[0].id;
+      const { data: oldRules } = await supabase
+        .from("schedule_rules")
+        .select("*")
+        .eq("account_id", prevAccId)
+        .eq("active_status", "Active");
+
+      if (oldRules && oldRules.length > 0) {
+        const now2 = new Date().toISOString();
+        const newRules = oldRules.map((r: any) => ({
+          id: uid("sr"),
+          account_id: accountId,
+          teacher_id: r.teacher_id,
+          weekdays: r.weekdays,
+          time: r.time,
+          duration: r.duration,
+          start_date: null,
+          end_date: null,
+          active_status: "Active",
+          created_at: now2,
+          updated_at: now2,
+        }));
+        await supabase.from("schedule_rules").insert(newRules);
+        await supabase
+          .from("schedule_rules")
+          .update({ active_status: "Inactive", updated_at: now2 })
+          .eq("account_id", prevAccId);
+      }
+    }
+  } catch (_) {}
+
   return { ok: true, accountId };
 }
 
