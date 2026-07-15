@@ -14,6 +14,7 @@ import { Table, Td } from "@/components/ui/Table";
 import Empty from "@/components/ui/Empty";
 import CancelModal from "./CancelModal";
 import SubstituteModal from "./SubstituteModal";
+import UploadReportModal from "./UploadReportModal";
 import BatchBar from "./BatchBar";
 import { useConfirm } from "@/components/ConfirmProvider";
 import {
@@ -27,12 +28,15 @@ import {
 
 type Tab = "today" | "week" | "overdue" | "all";
 
+// 課堂帶上 lesson_reports(id)，用來判斷是否已有報告
+export type LessonWithReports = Lesson & { lesson_reports?: { id: string }[] };
+
 type PartialStudent = Pick<Student, "id" | "zh_name" | "en_name">;
 type PartialTeacher = Pick<Teacher, "id" | "teacher_name" | "teacher_type" | "active_status">;
 type PartialAccount = Pick<Account, "id" | "student_id" | "course_label" | "teacher_type" | "course_family" | "duration_type" | "billing_type" | "snapshot">;
 
 interface Props {
-  lessons: Lesson[];
+  lessons: LessonWithReports[];
   students: PartialStudent[];
   teachers: PartialTeacher[];
   accounts: PartialAccount[];
@@ -44,6 +48,7 @@ type ModalState =
   | { kind: "none" }
   | { kind: "cancel"; lesson: Lesson }
   | { kind: "substitute"; lessons: Lesson[]; account: PartialAccount }
+  | { kind: "upload"; lesson: Lesson; existingReportId?: string }
 
 
 function Toast({ msg, ok }: { msg: string; ok: boolean }) {
@@ -410,6 +415,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
               const isCompleted = l.status === "completed";
               const isCancelled = l.status === "cancelled";
               const isScheduled = l.status === "scheduled";
+              const existingReportId = l.lesson_reports?.[0]?.id;
 
               return (
                 <tr
@@ -546,9 +552,35 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
                         </>
                       )}
                       {isCompleted && (
-                        <Btn kind="ghost" size="sm" disabled={isPending} onClick={() => handleRevert(l.id)}>
-                          ↺ 撤銷
-                        </Btn>
+                        <>
+                          {existingReportId ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="text-xs font-medium" style={{ color: C.gold }}>
+                                已生成
+                              </span>
+                              <Btn
+                                kind="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  setModal({ kind: "upload", lesson: l, existingReportId })
+                                }
+                              >
+                                重新生成
+                              </Btn>
+                            </span>
+                          ) : (
+                            <Btn
+                              kind="gold"
+                              size="sm"
+                              onClick={() => setModal({ kind: "upload", lesson: l })}
+                            >
+                              上傳報告
+                            </Btn>
+                          )}
+                          <Btn kind="ghost" size="sm" disabled={isPending} onClick={() => handleRevert(l.id)}>
+                            ↺ 撤銷
+                          </Btn>
+                        </>
                       )}
                       {l.is_substitute && !isCancelled && (
                         <Btn kind="ghost" size="sm" onClick={() => handleUndoSub(l)}>
@@ -584,6 +616,21 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
           phpRate={phpRate}
           onDone={(msg) => { showToast(msg); clearSelect(); closeModal(); }}
           onError={(msg) => showToast(msg, false)}
+          onClose={closeModal}
+        />
+      )}
+      {modal.kind === "upload" && (
+        <UploadReportModal
+          lessonId={modal.lesson.id}
+          studentName={
+            studentById[modal.lesson.student_id]?.zh_name ||
+            studentById[modal.lesson.student_id]?.en_name ||
+            "—"
+          }
+          lessonDate={modal.lesson.date}
+          teacherName={teacherById[modal.lesson.teacher_id || ""]?.teacher_name || "—"}
+          existingReportId={modal.existingReportId}
+          onGenerated={() => router.refresh()}
           onClose={closeModal}
         />
       )}

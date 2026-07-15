@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { C } from "@/lib/constants";
-import { money, todayYMD, weekRange } from "@/lib/utils";
+import { money, todayYMD, weekRange, addDays } from "@/lib/utils";
 import { periodOf, effectiveHanneShare, effectiveLeeCommission } from "@/lib/domain";
 import Card from "@/components/ui/Card";
 import Empty from "@/components/ui/Empty";
@@ -11,10 +11,11 @@ import HealthCheck from "./HealthCheck";
 import NextSteps from "./NextSteps";
 import DashboardActions from "./DashboardActions";
 import DashboardWidgets from "./DashboardWidgets";
+import PendingReports from "./PendingReports";
 
 async function loadData() {
   const supabase = createClient();
-  const [teachersRes, studentsRes, accountsRes, lessonsRes, remitRes, metaRes, rulesRes] =
+  const [teachersRes, studentsRes, accountsRes, lessonsRes, remitRes, metaRes, rulesRes, reportsRes] =
     await Promise.all([
       supabase.from("teachers").select("*"),
       supabase.from("students").select("*"),
@@ -23,6 +24,7 @@ async function loadData() {
       supabase.from("remittance_periods").select("*"),
       supabase.from("app_meta").select("*").eq("id", 1).single(),
       supabase.from("schedule_rules").select("*"),
+      supabase.from("lesson_reports").select("lesson_id"),
     ]);
   return {
     teachers: (teachersRes.data || []) as Teacher[],
@@ -32,11 +34,14 @@ async function loadData() {
     remit: (remitRes.data || []) as RemittancePeriod[],
     phpRate: metaRes.data?.php_rate || 1.8,
     scheduleRules: (rulesRes.data || []) as ScheduleRule[],
+    reportedLessonIds: new Set(
+      ((reportsRes.data || []) as { lesson_id: string }[]).map((r) => r.lesson_id)
+    ),
   };
 }
 
 export default async function DashboardPage() {
-  const { teachers, students, accounts, lessons, remit, phpRate, scheduleRules } = await loadData();
+  const { teachers, students, accounts, lessons, remit, phpRate, scheduleRules, reportedLessonIds } = await loadData();
 
   const today = todayYMD();
   const wk = weekRange();
@@ -93,6 +98,30 @@ export default async function DashboardPage() {
   // ── 今日課程明細 ─────────────────────────────────────────────────────────────
   const studentById = Object.fromEntries(students.map((s) => [s.id, s]));
   const teacherById = Object.fromEntries(teachers.map((t) => [t.id, t]));
+
+  // 尚未上傳報告的課堂（過去 ~48 小時內、已完成、無報告）
+  const reportCutoff = addDays(today, -2);
+  const pendingReports = lessons
+    .filter(
+      (l) =>
+        l.is_active &&
+        l.status === "completed" &&
+        l.date >= reportCutoff &&
+        !reportedLessonIds.has(l.id)
+    )
+    .sort((a, b) => {
+      if (a.date !== b.date) return b.date.localeCompare(a.date);
+      return (b.time || "").localeCompare(a.time || "");
+    })
+    .map((l) => ({
+      lessonId: l.id,
+      date: l.date,
+      studentName:
+        studentById[l.student_id]?.zh_name ||
+        studentById[l.student_id]?.en_name ||
+        "—",
+      teacherName: teacherById[l.teacher_id || ""]?.teacher_name || "—",
+    }));
 
   const todayFull = lessons
     .filter((l) => l.is_active && l.date === today)
@@ -164,6 +193,9 @@ export default async function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* 尚未上傳報告的課堂 */}
+      {pendingReports.length > 0 && <PendingReports pending={pendingReports} />}
 
       {/* 資料健康檢查 */}
       <HealthCheck
