@@ -5,9 +5,6 @@ import { Resend } from "resend";
 import { nanoid } from "nanoid";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
-const resend = new Resend(process.env.RESEND_API_KEY!);
-
 // VTT 轉純文字（去掉 WEBVTT 標頭、序號、時間碼）
 function vttToPlainText(vtt: string): string {
   return vtt
@@ -44,6 +41,10 @@ function checkMilestone(
 }
 
 export async function POST(request: Request) {
+  // 在 runtime 才初始化（避免 build 時於 module 層級執行、拿不到環境變數）
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+  const resend = new Resend(process.env.RESEND_API_KEY!);
+
   try {
     const { lessonId, vttContent, teacherNote, existingReportId } =
       await request.json();
