@@ -120,31 +120,71 @@ export async function cancelLesson(
   }
 
   if (!makeup) {
-    // 建自動延伸
-    const { error: extErr } = await supabase.from("lessons").insert({
-      id: uid("ls"),
-      account_id: lesson.account_id,
-      student_id: lesson.student_id,
-      teacher_id: lesson.teacher_id,
-      schedule_rule_id: null,
-      date: addDays(lesson.date, 7),
-      time: lesson.time,
-      duration: lesson.duration,
-      class_type: "extension" as ClassType,
-      status: "scheduled" as LessonStatus,
-      is_active: true,
-      is_backfill: false,
-      original_class_id: lessonId,
-      original_payout_snapshot: null,
-      is_substitute: false,
-      original_teacher_id: null,
-      payout_snapshot: lesson.payout_snapshot,
-      note: `自動延伸(原課 ${lesson.date})`,
-      superseded: false,
-      created_at: now,
-      updated_at: now,
-    });
-    if (extErr) return { error: extErr.message };
+    // makeup/extension 取消 → 不產生延伸
+    // general 且有排課規則 → 找下一個規則時段延伸
+    // general 且無排課規則(彈性排課) → 不產生延伸
+    const isGeneral = lesson.class_type === "general";
+    if (isGeneral) {
+      const { data: rules } = await supabase
+        .from("schedule_rules")
+        .select("id, weekdays, time")
+        .eq("account_id", lesson.account_id)
+        .eq("active_status", "Active");
+
+      let extDate: string | null = null;
+
+      if (rules && rules.length > 0) {
+        // 找最後一堂已排課程後的下一個符合週幾的日期
+        const { data: lastLesson } = await supabase
+          .from("lessons")
+          .select("date")
+          .eq("account_id", lesson.account_id)
+          .eq("is_active", true)
+          .eq("status", "scheduled")
+          .order("date", { ascending: false })
+          .limit(1)
+          .single();
+
+        const searchFrom = lastLesson?.date
+          ? addDays(lastLesson.date, 1)
+          : addDays(lesson.date, 1);
+
+        let cursor = searchFrom;
+        for (let i = 0; i < 60; i++) {
+          const wd = new Date(cursor + "T00:00:00").getDay();
+          const match = rules.find((r) => (r.weekdays as number[]).includes(wd));
+          if (match) { extDate = cursor; break; }
+          cursor = addDays(cursor, 1);
+        }
+      }
+
+      if (extDate) {
+        const { error: extErr } = await supabase.from("lessons").insert({
+          id: uid("ls"),
+          account_id: lesson.account_id,
+          student_id: lesson.student_id,
+          teacher_id: lesson.teacher_id,
+          schedule_rule_id: null,
+          date: extDate,
+          time: lesson.time,
+          duration: lesson.duration,
+          class_type: "extension" as ClassType,
+          status: "scheduled" as LessonStatus,
+          is_active: true,
+          is_backfill: false,
+          original_class_id: lessonId,
+          original_payout_snapshot: null,
+          is_substitute: false,
+          original_teacher_id: null,
+          payout_snapshot: lesson.payout_snapshot,
+          note: `自動延伸(原課 ${lesson.date})`,
+          superseded: false,
+          created_at: now,
+          updated_at: now,
+        });
+        if (extErr) return { error: extErr.message };
+      }
+    }
   } else {
     // 建 makeup
     const { error: mkErr } = await supabase.from("lessons").insert({
