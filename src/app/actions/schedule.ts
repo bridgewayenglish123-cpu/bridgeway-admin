@@ -156,8 +156,14 @@ export async function generateLessonsForAccount(accountId: string): Promise<{
     .eq("account_id", accountId);
 
   const activeLessons = (existingLessons || []).filter((l) => l.is_active);
-  const generalCount = activeLessons.filter((l) => l.class_type === "general").length;
-  const remaining = account.total_lessons - generalCount;
+  // 已佔用堂數 = completed 或 scheduled 的 general + extension
+  // cancelled 不算(已退回堂數)
+  const usedCount = activeLessons.filter(
+    (l) =>
+      (l.status === "completed" || l.status === "scheduled") &&
+      (l.class_type === "general" || l.class_type === "extension")
+  ).length;
+  const remaining = account.total_lessons - usedCount;
   if (remaining <= 0) return { ok: true, added: 0 };
 
   // 已存在的日期+時間 set(避免重複)
