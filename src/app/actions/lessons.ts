@@ -358,12 +358,120 @@ export async function deleteLesson(lessonId: string) {
   if (!lesson) return { error: "找不到課程" };
   if (lesson.status !== "scheduled") return { error: "只能刪除待上的課程" };
 
+  const { data: lessonToDelete } = await supabase
+    .from("lessons")
+    .select("account_id, student_id, date, time, duration, payout_snapshot")
+    .eq("id", lessonId)
+    .single();
+
   const { error } = await supabase
     .from("lessons")
     .delete()
     .eq("id", lessonId);
 
   if (error) return { error: error.message };
+
+  // 刪除後自動補齊：依排課規則生成下一堂
+  if (lessonToDelete?.account_id) {
+    const { data: acc } = await supabase
+      .from("accounts")
+      .select("total_lessons, student_id")
+      .eq("id", lessonToDelete.account_id)
+      .single();
+
+    if (acc) {
+      // 算剩餘堂數
+      const { count: completedCount } = await supabase
+        .from("lessons")
+        .select("id", { count: "exact", head: true })
+        .eq("account_id", lessonToDelete.account_id)
+        .eq("is_active", true)
+        .eq("status", "completed");
+
+      const { count: scheduledCount } = await supabase
+        .from("lessons")
+        .select("id", { count: "exact", head: true })
+        .eq("account_id", lessonToDelete.account_id)
+        .eq("is_active", true)
+        .eq("status", "scheduled");
+
+      const remaining = acc.total_lessons - (completedCount || 0) - (scheduledCount || 0);
+
+      if (remaining > 0) {
+        // 找排課規則
+        const { data: rules } = await supabase
+          .from("schedule_rules")
+          .select("*")
+          .eq("account_id", lessonToDelete.account_id)
+          .eq("active_status", "Active");
+
+        if (rules && rules.length > 0) {
+          // 找最後一堂已排課程
+          const { data: lastLesson } = await supabase
+            .from("lessons")
+            .select("date")
+            .eq("account_id", lessonToDelete.account_id)
+            .eq("is_active", true)
+            .eq("status", "scheduled")
+            .order("date", { ascending: false })
+            .limit(1)
+            .single();
+
+          const searchFrom = lastLesson?.date
+            ? addDays(lastLesson.date, 1)
+            : addDays(lessonToDelete.date, 1);
+
+          // 找下一個符合規則的日期
+          let cursor = searchFrom;
+          let found = false;
+          for (let i = 0; i < 90 && !found; i++) {
+            const wd = new Date(cursor + "T00:00:00").getDay();
+            const matchRule = rules.find((r) => (r.weekdays as number[]).includes(wd));
+            if (matchRule) {
+              // 檢查無衝突
+              const { data: conflict } = await supabase
+                .from("lessons")
+                .select("id")
+                .eq("student_id", acc.student_id)
+                .eq("is_active", true)
+                .eq("date", cursor)
+                .eq("time", matchRule.time)
+                .limit(1);
+
+              if (!conflict || conflict.length === 0) {
+                const now2 = new Date().toISOString();
+                await supabase.from("lessons").insert({
+                  id: uid("ls"),
+                  account_id: lessonToDelete.account_id,
+                  student_id: acc.student_id,
+                  teacher_id: matchRule.teacher_id || null,
+                  schedule_rule_id: matchRule.id,
+                  date: cursor,
+                  time: matchRule.time,
+                  duration: matchRule.duration,
+                  class_type: "general",
+                  status: "scheduled",
+                  is_active: true,
+                  is_backfill: false,
+                  original_class_id: null,
+                  original_payout_snapshot: null,
+                  is_substitute: false,
+                  original_teacher_id: null,
+                  payout_snapshot: lessonToDelete.payout_snapshot,
+                  note: null,
+                  superseded: false,
+                  created_at: now2,
+                  updated_at: now2,
+                });
+                found = true;
+              }
+            }
+            cursor = addDays(cursor, 1);
+          }
+        }
+      }
+    }
+  }
 
   revalidatePath("/lessons");
   revalidatePath("/accounts");
