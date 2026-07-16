@@ -289,3 +289,30 @@ export async function updateLessonNote(lessonId: string, note: string) {
   revalidatePath("/lessons");
   return { ok: true };
 }
+
+// ── 刪除待上課程(直接刪除,不產生延伸) ───────────────────────────────────────
+export async function deleteLesson(lessonId: string) {
+  const supabase = createClient();
+
+  // 確認只能刪 scheduled 的課
+  const { data: lesson } = await supabase
+    .from("lessons")
+    .select("status, account_id")
+    .eq("id", lessonId)
+    .single();
+
+  if (!lesson) return { error: "找不到課程" };
+  if (lesson.status !== "scheduled") return { error: "只能刪除待上的課程" };
+
+  const { error } = await supabase
+    .from("lessons")
+    .delete()
+    .eq("id", lessonId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/lessons");
+  revalidatePath("/accounts");
+  revalidatePath("/");
+  return { ok: true };
+}

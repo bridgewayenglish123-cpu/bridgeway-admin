@@ -18,6 +18,7 @@ import UploadReportModal from "./UploadReportModal";
 import BatchBar from "./BatchBar";
 import { useConfirm } from "@/components/ConfirmProvider";
 import {
+  deleteLesson,
   markLessonCompleted,
   markLessonsCompleted,
   revertLessonToScheduled,
@@ -251,6 +252,20 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
         const res = await cancelLessons(selectedLessons.map((l) => l.id));
         if (res.error) showToast(res.error, false);
         else { showToast("已取消 " + count + " 堂,各自延伸 +7 天"); clearSelect(); }
+      },
+    });
+  };
+
+  const handleDeleteLesson = (lesson: Lesson) => {
+    askConfirm({
+      title: "刪除課程",
+      message: "確定要刪除這堂課？\n\n" + lesson.date + " " + (lesson.time || "") + "\n\n此動作不可復原，不會產生延伸課，帳戶剩餘堂數自動回復。",
+      confirmLabel: "確認刪除",
+      danger: true,
+      onConfirm: async () => {
+        const res = await deleteLesson(lesson.id);
+        if (res.error) showToast(res.error, false);
+        else showToast("已刪除課程");
       },
     });
   };
