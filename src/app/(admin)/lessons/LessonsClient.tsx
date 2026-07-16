@@ -43,6 +43,7 @@ interface Props {
   accounts: PartialAccount[];
   priceRules: PriceRule[];
   phpRate: number;
+  scheduleRules: { id: string; account_id: string; active_status: string }[];
 }
 
 type ModalState =
@@ -71,7 +72,7 @@ const CLASS_TYPE_TONE: Record<string, "gray" | "amber" | "navy"> = {
 };
 
 
-export default function LessonsClient({ lessons, students, teachers, accounts, priceRules, phpRate }: Props) {
+export default function LessonsClient({ lessons, students, teachers, accounts, priceRules, phpRate, scheduleRules }: Props) {
   const [tab, setTab] = useState<Tab>("today");
   const [search, setSearch] = useState("");
   const [showCancelled, setShowCancelled] = useState(false);
@@ -257,15 +258,22 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
   };
 
   const handleDeleteLesson = (lesson: Lesson) => {
+    const acc = accountById[lesson.account_id];
+    const hasRules = scheduleRules?.some(
+      (r: any) => r.account_id === lesson.account_id && r.active_status === "Active"
+    );
+    const ruleNote = hasRules
+      ? "\n\n系統會依排課規則自動補上一堂新課程。"
+      : "\n\n此帳戶無排課規則，不會自動補課。";
     askConfirm({
       title: "刪除課程",
-      message: "確定要刪除這堂課？\n\n" + lesson.date + " " + (lesson.time || "") + "\n\n此動作不可復原，不會產生延伸課，帳戶剩餘堂數自動回復。",
+      message: "確定要刪除這堂課？\n\n" + lesson.date + " " + (lesson.time || "") + ruleNote,
       confirmLabel: "確認刪除",
       danger: true,
       onConfirm: async () => {
         const res = await deleteLesson(lesson.id);
         if (res.error) showToast(res.error, false);
-        else showToast("已刪除課程");
+        else showToast(hasRules ? "已刪除課程，系統已依規則補上新課" : "已刪除課程");
       },
     });
   };
