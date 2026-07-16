@@ -600,6 +600,11 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
                           </Btn>
                         </>
                       )}
+                      {isCancelled && (
+                        <Btn kind="ghost" size="sm" disabled={isPending} onClick={() => handleRevert(l.id)}>
+                          ↺ 撤銷取消
+                        </Btn>
+                      )}
                       {l.is_substitute && !isCancelled && (
                         <Btn kind="ghost" size="sm" onClick={() => handleUndoSub(l)}>
                           撤銷代課
