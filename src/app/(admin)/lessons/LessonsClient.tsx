@@ -564,6 +564,9 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
                           >
                             代課
                           </Btn>
+                          <Btn kind="danger" size="sm" onClick={() => handleDeleteLesson(l)}>
+                            刪除
+                          </Btn>
                         </>
                       )}
                       {isCompleted && (
