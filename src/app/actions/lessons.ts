@@ -38,12 +38,26 @@ export async function markLessonsCompleted(lessonIds: string[]) {
 // ── 復原為待上 ────────────────────────────────────────────────────────────────
 export async function revertLessonToScheduled(lessonId: string) {
   const supabase = createClient();
+  const now = new Date().toISOString();
+
+  // 1. 改回 scheduled
   const { error } = await supabase
     .from("lessons")
-    .update({ status: "scheduled", updated_at: new Date().toISOString() })
+    .update({ status: "scheduled", updated_at: now })
     .eq("id", lessonId);
   if (error) return { error: error.message };
+
+  // 2. 刪除因此取消而產生的延伸課
+  await supabase
+    .from("lessons")
+    .delete()
+    .eq("original_class_id", lessonId)
+    .eq("class_type", "extension")
+    .eq("is_active", true);
+
   revalidatePath("/lessons");
+  revalidatePath("/remit");
+  revalidatePath("/accounts");
   revalidatePath("/");
   return { ok: true };
 }
