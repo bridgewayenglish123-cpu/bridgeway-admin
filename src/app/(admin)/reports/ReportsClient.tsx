@@ -1,5 +1,6 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { C } from "@/lib/constants";
 
 type Report = {
@@ -28,6 +29,15 @@ export default function ReportsClient({
 }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Report | null>(null);
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const reportId = searchParams.get("report");
+    if (reportId) {
+      const found = reports.find(r => r.id === reportId);
+      if (found) setSelected(found);
+    }
+  }, [searchParams, reports]);
 
   const studentById = useMemo(() => Object.fromEntries(students.map(s => [s.id, s])), [students]);
   const lessonById = useMemo(() => Object.fromEntries(lessons.map(l => [l.id, l])), [lessons]);
