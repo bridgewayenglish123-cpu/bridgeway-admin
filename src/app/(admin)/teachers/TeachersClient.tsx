@@ -1,3 +1,4 @@
+"use client";
 
 // ── Teacher Portal 建立帳號 ──────────────────────────────────────────────────
 function TeacherPortalCreateForm({ teacher, onDone, showToast }: {
@@ -85,9 +86,6 @@ function TeacherPortalManageForm({ teacher, onDone, showToast }: {
   );
 }
 
-"use client";
-import { resetClassroomPassword } from "@/app/actions/classroom";
-import { createTeacherPortalAccount, deleteTeacherPortalAccount } from "@/app/actions/classroom";
 
 import { useState, useTransition } from "react";
 import { C } from "@/lib/constants";
