@@ -7,7 +7,7 @@ import type { Lesson, Student, Teacher } from "@/lib/supabase/types";
 import Card from "@/components/ui/Card";
 import Btn from "@/components/ui/Btn";
 import Badge from "@/components/ui/Badge";
-import { Table, Td } from "@/components/ui/Table";
+import { Table, Td, MobileCardList, MobileCard } from "@/components/ui/Table";
 import Empty from "@/components/ui/Empty";
 import { markLessonCompleted, markLessonsCompleted } from "@/app/actions/lessons";
 
@@ -141,7 +141,8 @@ export default function DashboardActions({ todayFull, studentById, teacherById, 
         {todayFull.length === 0 ? (
           <Empty>今天沒有排定的課程。可以到「課程管理」看看本週安排。</Empty>
         ) : (
-          <Table head={["時間", "學生", "老師", "類型", "狀態", "動作"]}>
+          <>
+          <Table head={["時間", "學生", "老師", "類型", "狀態", "動作"]} mobileCard>
             {todayFull.map((l) => {
               const status = getStatus(l);
               const isScheduled = status === "scheduled";
@@ -195,6 +196,42 @@ export default function DashboardActions({ todayFull, studentById, teacherById, 
               );
             })}
           </Table>
+
+          <MobileCardList>
+            {todayFull.map((l) => {
+              const status = getStatus(l);
+              const isScheduled = status === "scheduled";
+              return (
+                <MobileCard key={l.id}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-semibold text-[14px]" style={{ color: C.navy }}>
+                        {studentById[l.student_id]?.zh_name || "—"}
+                      </div>
+                      <div className="text-[12px] mt-0.5" style={{ color: C.muted }}>
+                        {l.time || "—"} · {teacherById[l.teacher_id || ""]?.teacher_name || "—"}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <Badge tone={CLASS_TYPE_TONE[l.class_type] || "gray"}>
+                        {CLASS_TYPE_LABEL[l.class_type] || l.class_type}
+                      </Badge>
+                      <Badge tone={status === "completed" ? "green" : status === "cancelled" ? "red" : "gray"}>
+                        {status === "completed" ? "已完成" : status === "cancelled" ? "已取消" : "待上"}
+                      </Badge>
+                    </div>
+                  </div>
+                  {isScheduled && (
+                    <div className="flex gap-1.5 mt-1">
+                      <Btn size="sm" kind="good" disabled={isPending} onClick={() => handleComplete(l.id)}>完成</Btn>
+                      <Btn size="sm" kind="ghost" onClick={() => router.push("/lessons")}>其他</Btn>
+                    </div>
+                  )}
+                </MobileCard>
+              );
+            })}
+          </MobileCardList>
+          </>
         )}
       </Card>
 
