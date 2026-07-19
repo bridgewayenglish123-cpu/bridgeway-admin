@@ -260,10 +260,10 @@ export async function bookFlexLesson(data: {
         .from("students").select("zh_name").eq("id", teacherConflict.student_id).single();
       const { data: teacherData } = await supabase
         .from("teachers").select("teacher_name").eq("id", data.teacher_id).single();
-      const endTime = new Date(\`2000-01-01T\${data.time}\`);
+      const endTime = new Date("2000-01-01T" + data.time);
       endTime.setMinutes(endTime.getMinutes() + data.duration);
       const endStr = endTime.toTimeString().slice(0, 5);
-      const existEnd = new Date(\`2000-01-01T\${teacherConflict.time}\`);
+      const existEnd = new Date("2000-01-01T" + teacherConflict.time);
       existEnd.setMinutes(existEnd.getMinutes() + (teacherConflict.duration || 0));
       return {
         ok: false,
