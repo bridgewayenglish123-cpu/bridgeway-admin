@@ -11,6 +11,7 @@ import HealthCheck from "./HealthCheck";
 import NextSteps from "./NextSteps";
 import DashboardActions from "./DashboardActions";
 import DashboardWidgets from "./DashboardWidgets";
+import { EmailToggle } from "./EmailToggle";
 import PendingReports from "./PendingReports";
 
 async function loadData() {
