@@ -634,7 +634,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
             {filtered.map((l) => {
               const student = studentById[l.student_id];
               const teacher = teacherById[l.teacher_id || ""];
-              const snap = l.payout_snapshot || {} as PayoutSnapshot;
+              const snap = (l.payout_snapshot || {}) as PayoutSnapshot;
               const leeFee = effectiveLeeCommission(l);
               const isCompleted = l.status === "completed";
               const isCancelled = l.status === "cancelled";
