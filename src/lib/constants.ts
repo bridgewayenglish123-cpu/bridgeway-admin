@@ -36,6 +36,7 @@ export const TABS = [
   { key: "students", label: "學生管理" },
   { key: "teachers", label: "老師管理" },
   { key: "rules", label: "價格規則" },
+  { key: "reports", label: "報告管理" },
   { key: "remit", label: "匯款總覽" },
 ];
 
