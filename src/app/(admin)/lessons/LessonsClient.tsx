@@ -581,7 +581,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
                         <>
                           {existingReportId ? (
                             <span className="inline-flex items-center gap-1.5">
-                              
+                              <a
                                 href={`/reports?report=${existingReportId}`}
                                 className="text-xs px-2 py-1 rounded-lg font-medium"
                                 style={{ background: "#EAF0F6", color: C.navy }}
