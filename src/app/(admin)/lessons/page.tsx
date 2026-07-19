@@ -5,6 +5,7 @@ import LessonsClient, { type LessonWithReports } from "./LessonsClient";
 
 async function loadData() {
   const supabase = createClient();
+  const adminSupabase = createAdminClient();
   const [lessonsRes, studentsRes, scheduleRulesRes, metaRes, teachersRes, accountsRes, rulesRes] = await Promise.all([
     adminSupabase.from("lessons").select("*, lesson_reports ( id )").order("date", { ascending: false }).order("time"),
     supabase.from("students").select("id,zh_name,en_name"),
