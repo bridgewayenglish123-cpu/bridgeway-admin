@@ -147,6 +147,9 @@ ${transcript}
 - 禁止空泛稱讚（如「你表現很好」），只說具體觀察
 - 單字和片語只抓「學生明顯不熟悉、或老師特別解釋過」的詞彙，最多 8 個單字、6 個片語
 - 錯誤模式要給具體例子和修正
+- errors 的 pattern 必須同時提供 pattern_zh（中文名稱）和 pattern_en（英文名稱），example 欄位只能是英文
+- reflection_question 必須是語言輸出練習（造句、口說、寫作），絕對不能問課文情節
+- vocabulary 最少 6 個、最多 10 個；phrases 最少 4 個、最多 8 個
 
 嚴格輸出以下 JSON 格式，不加任何其他文字、不加 markdown：
 
@@ -197,8 +200,8 @@ ${transcript}
   },
   "next_focus": "下堂課建議重點，給老師看的純文字",
   "reflection_question": {
-    "zh": "給學生的開放式思考題，中文，與本課內容相關",
-    "en": "Open-ended reflection question in English, related to today's lesson"
+    "zh": "針對本課學習點的語言輸出練習題（用中文說明）。必須是造句、口說或寫作練習，例如：用今天學的單字造一個關於自己生活的句子，或用英文寫3句描述最近做的事（用過去式）。禁止問課文情節或故事內容。",
+    "en": "A language output practice prompt directly tied to today's learning point. Must be a speaking or writing exercise, e.g. use a vocabulary word in a sentence about your own life, or write 3 sentences about something you did recently using past tense. Do NOT ask about the story plot or characters."
   }
 }`;
 
