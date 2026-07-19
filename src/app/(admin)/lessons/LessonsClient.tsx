@@ -428,6 +428,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
              "沒有符合條件的課程。"}
           </Empty>
         ) : (
+          <>
           <Table head={["", "日期", "時間", "學生", "老師", "類型", "時長", "狀態", "費用", "備註", "操作"]} mobileCard>
             {filtered.map((l) => {
               const student = studentById[l.student_id];
@@ -688,6 +689,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
               );
             })}
           </MobileCardList>
+          </>
         )}
       </Card>
 
