@@ -855,15 +855,14 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
             </button>
           ))}
         </div>
-        <select className="rounded-lg border px-3 py-2 text-sm"
+        <input
+          type="text"
+          className="rounded-lg border px-3 py-2 text-sm min-w-[200px]"
           style={{ borderColor: C.line, color: C.text }}
+          placeholder="搜尋學生 / 課程..."
           value={filterStudent}
-          onChange={(e) => setFilterStudent(e.target.value)}>
-          <option value="">全部學生</option>
-          {students.map((s) => (
-            <option key={s.id} value={s.id}>{s.zh_name}</option>
-          ))}
-        </select>
+          onChange={(e) => setFilterStudent(e.target.value)}
+        />
       </div>
 
       {/* 列表 */}
