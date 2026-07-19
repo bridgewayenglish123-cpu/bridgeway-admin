@@ -1015,7 +1015,7 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
                     <Btn kind="ghost" size="sm" onClick={() => toggleExpand(acc.id)}>
                       {expandedIds.has(acc.id) ? "收起" : "展開課程"}
                     </Btn>
-                    <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "flex", prefillStudentId: acc.student_id, prefillRuleCode: "", prefillNote: "" })}>
+                    <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "flex", account: acc })}>
                       彈性排課
                     </Btn>
                   </div>
