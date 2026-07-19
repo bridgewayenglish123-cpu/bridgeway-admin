@@ -1,5 +1,87 @@
 "use client";
 
+// ── Classroom 建立帳號表單 ────────────────────────────────────────────────────
+function ClassroomCreateForm({ student, onDone }: { student: { id: string; zh_name: string; zoom_email: string | null }; onDone: () => void }) {
+  const [email, setEmail] = useState(student.zoom_email || "");
+  const [password, setPassword] = useState("");
+  const [isPending, startTransition] = useTransition();
+  const { showToast } = useToast();
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="block text-xs font-semibold mb-1" style={{ color: "#6B7B8E" }}>登入 Email *</label>
+        <input type="email" className="w-full rounded-lg border px-3 py-2 text-sm"
+          value={email} onChange={e => setEmail(e.target.value)} placeholder="student@example.com" />
+      </div>
+      <div>
+        <label className="block text-xs font-semibold mb-1" style={{ color: "#6B7B8E" }}>臨時密碼 *</label>
+        <input type="text" className="w-full rounded-lg border px-3 py-2 text-sm"
+          value={password} onChange={e => setPassword(e.target.value)} placeholder="至少 8 字元" />
+        <div className="text-xs mt-1" style={{ color: "#6B7B8E" }}>學生首次登入後可自行修改密碼</div>
+      </div>
+      <div className="flex gap-2 justify-end">
+        <button className="px-3 py-1.5 text-sm rounded-lg" style={{ color: "#6B7B8E" }} onClick={onDone}>取消</button>
+        <button
+          disabled={!email || !password || password.length < 8 || isPending}
+          className="px-4 py-1.5 text-sm rounded-lg font-medium text-white disabled:opacity-50"
+          style={{ background: "#1A3A5C" }}
+          onClick={() => startTransition(async () => {
+            const res = await createClassroomAccount({ studentId: student.id, email, password, zhName: student.zh_name });
+            if (res.error) showToast(res.error, false);
+            else { showToast(`${student.zh_name} 的 Classroom 帳號已開通`); onDone(); }
+          })}>
+          {isPending ? "開通中…" : "開通帳號"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Classroom 管理帳號表單 ────────────────────────────────────────────────────
+function ClassroomManageForm({ student, onDone }: { student: { id: string; zh_name: string; auth_user_id: string | null }; onDone: () => void }) {
+  const [password, setPassword] = useState("");
+  const [isPending, startTransition] = useTransition();
+  const { showToast } = useToast();
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg px-3 py-2 text-xs" style={{ background: "#E8F5E9", color: "#2E7D32" }}>
+        ✓ Classroom 帳號已開通
+      </div>
+      <div>
+        <label className="block text-xs font-semibold mb-1" style={{ color: "#6B7B8E" }}>重設密碼</label>
+        <input type="text" className="w-full rounded-lg border px-3 py-2 text-sm"
+          value={password} onChange={e => setPassword(e.target.value)} placeholder="輸入新密碼（至少 8 字元）" />
+      </div>
+      <div className="flex gap-2 justify-end">
+        <button
+          disabled={!student.auth_user_id || isPending}
+          className="px-3 py-1.5 text-xs rounded-lg font-medium text-white disabled:opacity-50"
+          style={{ background: "#C0392B" }}
+          onClick={() => startTransition(async () => {
+            if (!confirm("確定要刪除此帳號？")) return;
+            const res = await deleteClassroomAccount({ studentId: student.id, authUserId: student.auth_user_id! });
+            if (res.error) showToast(res.error, false);
+            else { showToast("帳號已刪除"); onDone(); }
+          })}>刪除帳號</button>
+        <button
+          disabled={!password || password.length < 8 || !student.auth_user_id || isPending}
+          className="px-4 py-1.5 text-sm rounded-lg font-medium text-white disabled:opacity-50"
+          style={{ background: "#1A3A5C" }}
+          onClick={() => startTransition(async () => {
+            const res = await resetClassroomPassword({ authUserId: student.auth_user_id!, newPassword: password });
+            if (res.error) showToast(res.error, false);
+            else { showToast("密碼已重設"); onDone(); }
+          })}>
+          {isPending ? "儲存中…" : "重設密碼"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
 import { useState, useTransition, useMemo } from "react";
 import { C } from "@/lib/constants";
 import { todayYMD } from "@/lib/utils";
@@ -713,6 +795,32 @@ export default function StudentsClient({ students, teachers, accounts, lessons, 
       )}
 
       {/* #7 刪除第二階段:最終確認 */}
+
+      {modal.kind === "classroom" && (() => {
+        const s = modal.student;
+        const hasAccount = !!s.auth_user_id;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: "rgba(10,30,54,0.55)" }}
+            onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
+            <div className="w-full max-w-sm rounded-2xl p-5 space-y-4"
+              style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}>
+              <h3 className="text-base font-semibold" style={{ color: C.navy }}>
+                {hasAccount ? "Classroom 帳號管理" : "開通 Classroom 帳號"}
+              </h3>
+              <div className="text-sm" style={{ color: C.text }}>
+                學生：<strong>{s.zh_name}</strong>
+              </div>
+              {hasAccount ? (
+                <ClassroomManageForm student={s} onDone={closeModal} />
+              ) : (
+                <ClassroomCreateForm student={s} onDone={closeModal} />
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {modal.kind === "confirm-delete-final" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: "rgba(10,30,54,0.55)" }}
