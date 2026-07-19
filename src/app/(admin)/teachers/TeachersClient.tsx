@@ -395,6 +395,31 @@ export default function TeachersClient({ teachers, stats }: Props) {
         </>
       )}
 
+      {modal.kind === "portal" && (() => {
+        const t = modal.teacher;
+        const hasAccount = !!t.auth_user_id;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: "rgba(10,30,54,0.55)" }}
+            onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
+            <div className="w-full max-w-sm rounded-2xl p-5 space-y-4"
+              style={{ background: C.card, boxShadow: "0 8px 32px rgba(15,42,74,0.18)" }}>
+              <h3 className="text-base font-semibold" style={{ color: C.navy }}>
+                {hasAccount ? "Teacher Portal 帳號管理" : "開通 Teacher Portal 帳號"}
+              </h3>
+              <div className="text-sm" style={{ color: C.text }}>
+                老師：<strong>{t.teacher_name}</strong>
+              </div>
+              {hasAccount ? (
+                <TeacherPortalManageForm teacher={t} onDone={closeModal} onToast={showToast} />
+              ) : (
+                <TeacherPortalCreateForm teacher={t} onDone={closeModal} onToast={showToast} />
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {(modal.kind === "add" || modal.kind === "edit") && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: "rgba(10,30,54,0.55)" }}
