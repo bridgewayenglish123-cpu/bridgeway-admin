@@ -1,11 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { Student, Teacher, Account, PriceRule } from "@/lib/supabase/types";
 import LessonsClient, { type LessonWithReports } from "./LessonsClient";
 
 async function loadData() {
   const supabase = createClient();
   const [lessonsRes, studentsRes, scheduleRulesRes, metaRes, teachersRes, accountsRes, rulesRes] = await Promise.all([
-    supabase.from("lessons").select("*, lesson_reports ( id )").order("date", { ascending: false }).order("time"),
+    adminSupabase.from("lessons").select("*, lesson_reports ( id )").order("date", { ascending: false }).order("time"),
     supabase.from("students").select("id,zh_name,en_name"),
     supabase.from("schedule_rules").select("id,account_id,active_status"),
     supabase.from("app_meta").select("php_rate").eq("id", 1).single(),
