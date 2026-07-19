@@ -7,7 +7,7 @@ import { effectiveHanneShare, effectiveLeeCommission } from "@/lib/domain";
 import { classifyLesson } from "./RemitClient";
 import type { Teacher, Account, Lesson } from "@/lib/supabase/types";
 import Card from "@/components/ui/Card";
-import { Table, Td } from "@/components/ui/Table";
+import { Table, Td, MobileCardList, MobileCard } from "@/components/ui/Table";
 
 interface Props {
   teachers: Teacher[];
@@ -95,7 +95,8 @@ export default function TotalsCard({ teachers, lessons, accountById, phpRate }: 
           尚無完課紀錄。
         </div>
       ) : (
-        <Table head={["老師", "試聽 25分", "短課 25分", "完整 55分", "總堂", "累計 NTD", "累計 PHP"]}>
+        <>
+        <Table head={["老師", "試聽 25分", "短課 25分", "完整 55分", "總堂", "累計 NTD", "累計 PHP"]} mobileCard>
           {rows.map((r) => (
             <tr key={r.teacherName} style={{ borderBottom: `1px solid ${C.line}` }}>
               <Td><span className="font-medium" style={{ color: C.navy }}>{r.teacherName}</span></Td>
@@ -117,6 +118,36 @@ export default function TotalsCard({ teachers, lessons, accountById, phpRate }: 
             <Td><span className="font-semibold" style={{ color: C.gold }}>₱ {money(grandTotal.php)}</span></Td>
           </tr>
         </Table>
+
+        <MobileCardList>
+          {rows.map((r) => (
+            <MobileCard key={r.teacherName}>
+              <div className="flex items-center justify-between">
+                <div className="font-semibold text-[14px]" style={{ color: C.navy }}>{r.teacherName}</div>
+                <div className="text-right">
+                  <div className="font-semibold text-[14px]" style={{ color: C.navy }}>NT$ {money(r.ntd)}</div>
+                  <div className="text-[12px]" style={{ color: C.gold }}>₱ {money(r.php)}</div>
+                </div>
+              </div>
+              <div className="flex gap-3 text-[12px] mt-1" style={{ color: C.muted }}>
+                {r.trial > 0 && <span>試聽 {r.trial}</span>}
+                {r.s25 > 0 && <span>短課 {r.s25}</span>}
+                {r.l55 > 0 && <span>完整 {r.l55}</span>}
+                <span>共 {r.total} 堂</span>
+              </div>
+            </MobileCard>
+          ))}
+          <div className="rounded-xl p-3 mt-1" style={{ background: "#EAF0F6" }}>
+            <div className="flex items-center justify-between">
+              <div className="font-semibold text-[13px]" style={{ color: C.navy }}>合計 · {grandTotal.total} 堂</div>
+              <div className="text-right">
+                <div className="font-semibold" style={{ color: C.navy }}>NT$ {money(grandTotal.ntd)}</div>
+                <div className="text-[12px]" style={{ color: C.gold }}>₱ {money(grandTotal.php)}</div>
+              </div>
+            </div>
+          </div>
+        </MobileCardList>
+        </>
       )}
     </Card>
   );
