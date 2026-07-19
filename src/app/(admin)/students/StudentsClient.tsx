@@ -88,7 +88,7 @@ import Card from "@/components/ui/Card";
 import Btn from "@/components/ui/Btn";
 import { createClassroomAccount, resetClassroomPassword, deleteClassroomAccount } from "@/app/actions/classroom";
 import Badge from "@/components/ui/Badge";
-import { Table, Td } from "@/components/ui/Table";
+import { Table, Td, MobileCardList, MobileCard } from "@/components/ui/Table";
 import Empty from "@/components/ui/Empty";
 import { useConfirm } from "@/components/ConfirmProvider";
 import {
@@ -634,7 +634,8 @@ export default function StudentsClient({ students, teachers, accounts, lessons, 
             {students.length === 0 ? "還沒有任何學生。" : "沒有符合條件的學生。"}
           </Empty>
         ) : (
-          <Table head={["姓名", "老師", "狀態", "剩餘堂數", "帳戶", "操作"]}>
+          <>
+          <Table head={["姓名", "老師", "狀態", "剩餘堂數", "帳戶", "操作"]} mobileCard>
             {filtered.map((s) => (
               <tr key={s.id} style={{ borderBottom: `1px solid ${C.line}` }}>
                 <Td>
@@ -685,6 +686,44 @@ export default function StudentsClient({ students, teachers, accounts, lessons, 
               </tr>
             ))}
           </Table>
+
+          <MobileCardList>
+            {filtered.map((s) => (
+              <MobileCard key={s.id}>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="font-semibold text-[14px]" style={{ color: C.navy }}>{s.zh_name}</div>
+                    {s.en_name && <div className="text-[12px]" style={{ color: C.muted }}>{s.en_name}</div>}
+                  </div>
+                  <select
+                    className="rounded border px-1.5 py-1 text-xs"
+                    style={{ borderColor: C.line, color: C.text }}
+                    value={s.status}
+                    onChange={(e) => handleStatusChange(s, e.target.value as StudentStatus)}
+                    disabled={isPending}>
+                    <option value="Active">在學</option>
+                    <option value="Paused">暫停中</option>
+                    <option value="Closed">已結束</option>
+                  </select>
+                </div>
+                <div className="text-[12px] flex gap-3" style={{ color: C.muted }}>
+                  <span>老師：{teacherById[s.current_teacher_id || ""]?.teacher_name || "—"}</span>
+                  <span>剩 <strong style={{ color: getStudentRemaining(s.id) > 0 ? C.navy : C.muted }}>{getStudentRemaining(s.id)}</strong> 堂</span>
+                  <span>帳戶 {getStudentAccountCount(s.id)}</span>
+                </div>
+                <div className="flex gap-1 flex-wrap mt-1">
+                  <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "detail", student: s })}>查看</Btn>
+                  <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "edit", student: s })}>編輯</Btn>
+                  <Btn kind={s.auth_user_id ? "good" : "ghost"} size="sm"
+                    onClick={() => setModal({ kind: "classroom", student: s })}>
+                    {s.auth_user_id ? "🎓" : "開通"}
+                  </Btn>
+                  <Btn kind="danger" size="sm" onClick={() => handleDeleteConfirm(s)}>刪除</Btn>
+                </div>
+              </MobileCard>
+            ))}
+          </MobileCardList>
+          </>
         )}
       </Card>
 
