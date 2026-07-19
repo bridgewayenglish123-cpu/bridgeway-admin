@@ -872,6 +872,7 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
             {accounts.length === 0 ? "還沒有任何課程帳戶。點右上角開課。" : "沒有符合條件的帳戶。"}
           </Empty>
         ) : (
+          <>
           <Table head={["", "學生", "課程", "狀態", "進度", "剩餘", "操作"]} mobileCard>
             {filtered.map((acc) => {
               const st = getStatus(acc);
@@ -1022,6 +1023,7 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
               );
             })}
           </MobileCardList>
+          </>
         )}
       </Card>
 
