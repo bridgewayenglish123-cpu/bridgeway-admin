@@ -69,3 +69,44 @@ export async function deleteClassroomAccount(data: {
   revalidatePath("/students");
   return { ok: true };
 }
+
+export async function createTeacherPortalAccount(data: {
+  teacherId: string;
+  email: string;
+  password: string;
+  teacherName: string;
+}) {
+  const supabase = createAdminClient();
+  const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
+    email: data.email,
+    password: data.password,
+    email_confirm: true,
+    user_metadata: { teacher_name: data.teacherName, role: "teacher" },
+  });
+  if (authErr) return { error: authErr.message };
+  if (!authData.user) return { error: "建立帳號失敗" };
+
+  const { error: updateErr } = await supabase
+    .from("teachers")
+    .update({ auth_user_id: authData.user.id, updated_at: new Date().toISOString().slice(0, 10) })
+    .eq("id", data.teacherId);
+
+  if (updateErr) return { error: updateErr.message };
+  revalidatePath("/teachers");
+  return { ok: true };
+}
+
+export async function deleteTeacherPortalAccount(data: {
+  teacherId: string;
+  authUserId: string;
+}) {
+  const supabase = createAdminClient();
+  const { error } = await supabase.auth.admin.deleteUser(data.authUserId);
+  if (error) return { error: error.message };
+  await supabase
+    .from("teachers")
+    .update({ auth_user_id: null, updated_at: new Date().toISOString().slice(0, 10) })
+    .eq("id", data.teacherId);
+  revalidatePath("/teachers");
+  return { ok: true };
+}

@@ -1,4 +1,93 @@
+
+// ── Teacher Portal 建立帳號 ──────────────────────────────────────────────────
+function TeacherPortalCreateForm({ teacher, onDone, showToast }: {
+  teacher: { id: string; teacher_name: string; email: string | null };
+  onDone: () => void;
+  showToast: (msg: string, ok?: boolean) => void;
+}) {
+  const [email, setEmail] = useState(teacher.email || "");
+  const [password, setPassword] = useState("");
+  const [isPending, startTransition] = useTransition();
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="block text-xs font-semibold mb-1" style={{ color: "#6B7B8E" }}>登入 Email *</label>
+        <input type="email" className="w-full rounded-lg border px-3 py-2 text-sm"
+          value={email} onChange={e => setEmail(e.target.value)} placeholder="teacher@example.com" />
+      </div>
+      <div>
+        <label className="block text-xs font-semibold mb-1" style={{ color: "#6B7B8E" }}>臨時密碼 *</label>
+        <input type="text" className="w-full rounded-lg border px-3 py-2 text-sm"
+          value={password} onChange={e => setPassword(e.target.value)} placeholder="至少 8 字元" />
+      </div>
+      <div className="flex gap-2 justify-end">
+        <button className="px-3 py-1.5 text-sm rounded-lg" style={{ color: "#6B7B8E" }} onClick={onDone}>取消</button>
+        <button
+          disabled={!email || !password || password.length < 8 || isPending}
+          className="px-4 py-1.5 text-sm rounded-lg font-medium text-white disabled:opacity-50"
+          style={{ background: "#1A3A5C" }}
+          onClick={() => startTransition(async () => {
+            const res = await createTeacherPortalAccount({ teacherId: teacher.id, email, password, teacherName: teacher.teacher_name });
+            if (res.error) showToast(res.error, false);
+            else { showToast(`${teacher.teacher_name} 的 Teacher Portal 帳號已開通`); onDone(); }
+          })}>
+          {isPending ? "開通中…" : "開通帳號"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Teacher Portal 管理帳號 ───────────────────────────────────────────────────
+function TeacherPortalManageForm({ teacher, onDone, showToast }: {
+  teacher: { id: string; teacher_name: string; auth_user_id: string | null };
+  onDone: () => void;
+  showToast: (msg: string, ok?: boolean) => void;
+}) {
+  const [password, setPassword] = useState("");
+  const [isPending, startTransition] = useTransition();
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg px-3 py-2 text-xs" style={{ background: "#E8F5E9", color: "#2E7D32" }}>
+        ✓ Teacher Portal 帳號已開通
+      </div>
+      <div>
+        <label className="block text-xs font-semibold mb-1" style={{ color: "#6B7B8E" }}>重設密碼</label>
+        <input type="text" className="w-full rounded-lg border px-3 py-2 text-sm"
+          value={password} onChange={e => setPassword(e.target.value)} placeholder="輸入新密碼（至少 8 字元）" />
+      </div>
+      <div className="flex gap-2 justify-end">
+        <button
+          disabled={!teacher.auth_user_id || isPending}
+          className="px-3 py-1.5 text-xs rounded-lg font-medium text-white disabled:opacity-50"
+          style={{ background: "#C0392B" }}
+          onClick={() => startTransition(async () => {
+            if (!confirm("確定要刪除此帳號？")) return;
+            const res = await deleteTeacherPortalAccount({ teacherId: teacher.id, authUserId: teacher.auth_user_id! });
+            if (res.error) showToast(res.error, false);
+            else { showToast("帳號已刪除"); onDone(); }
+          })}>刪除帳號</button>
+        <button
+          disabled={!password || password.length < 8 || !teacher.auth_user_id || isPending}
+          className="px-4 py-1.5 text-sm rounded-lg font-medium text-white disabled:opacity-50"
+          style={{ background: "#1A3A5C" }}
+          onClick={() => startTransition(async () => {
+            const res = await resetClassroomPassword({ authUserId: teacher.auth_user_id!, newPassword: password });
+            if (res.error) showToast(res.error, false);
+            else { showToast("密碼已重設"); onDone(); }
+          })}>
+          {isPending ? "儲存中…" : "重設密碼"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 "use client";
+import { resetClassroomPassword } from "@/app/actions/classroom";
+import { createTeacherPortalAccount, deleteTeacherPortalAccount } from "@/app/actions/classroom";
 
 import { useState, useTransition } from "react";
 import { C } from "@/lib/constants";
@@ -29,7 +118,8 @@ interface Props {
 type ModalState =
   | { kind: "none" }
   | { kind: "add" }
-  | { kind: "edit"; teacher: Teacher };
+  | { kind: "edit"; teacher: Teacher }
+  | { kind: "portal"; teacher: Teacher };
 
 const EMPTY_FORM = {
   teacher_name: "", teacher_code: "", teacher_type: "Other" as TeacherType,
@@ -254,6 +344,10 @@ export default function TeachersClient({ teachers, stats }: Props) {
                 <Td>
                   <div className="flex gap-1.5 flex-wrap">
                     <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "edit", teacher: t })}>編輯</Btn>
+                    <Btn kind={t.auth_user_id ? "good" : "ghost"} size="sm"
+                      onClick={() => setModal({ kind: "portal", teacher: t })}>
+                      {t.auth_user_id ? "🎓 Portal 已開通" : "開通 Portal"}
+                    </Btn>
                     {isActive
                       ? <Btn kind="ghost" size="sm" onClick={() => handleDeactivate(t)}>停用</Btn>
                       : <Btn kind="ghost" size="sm" onClick={() => handleActivate(t)}>啟用</Btn>
