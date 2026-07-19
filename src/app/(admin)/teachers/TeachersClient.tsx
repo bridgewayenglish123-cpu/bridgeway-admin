@@ -33,7 +33,15 @@ function TeacherPortalCreateForm({ teacher, onDone, showToast }: {
           onClick={() => startTransition(async () => {
             const res = await createTeacherPortalAccount({ teacherId: teacher.id, email, password, teacherName: teacher.teacher_name });
             if (res.error) showToast(res.error, false);
-            else { showToast(`${teacher.teacher_name} 的 Teacher Portal 帳號已開通`); onDone(); }
+            else {
+              // 存密碼備註
+              await fetch("/api/update-teacher-hint", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ teacherId: teacher.id, hint: password }),
+              });
+              showToast(`${teacher.teacher_name} 的 Teacher Portal 帳號已開通`); onDone();
+            }
           })}>
           {isPending ? "開通中…" : "開通帳號"}
         </button>
@@ -44,7 +52,7 @@ function TeacherPortalCreateForm({ teacher, onDone, showToast }: {
 
 // ── Teacher Portal 管理帳號 ───────────────────────────────────────────────────
 function TeacherPortalManageForm({ teacher, onDone, showToast }: {
-  teacher: { id: string; teacher_name: string; auth_user_id: string | null };
+  teacher: { id: string; teacher_name: string; auth_user_id: string | null; portal_password_hint: string | null };
   onDone: () => void;
   showToast: (msg: string, ok?: boolean) => void;
 }) {
@@ -56,6 +64,12 @@ function TeacherPortalManageForm({ teacher, onDone, showToast }: {
       <div className="rounded-lg px-3 py-2 text-xs" style={{ background: "#E8F5E9", color: "#2E7D32" }}>
         ✓ Teacher Portal 帳號已開通
       </div>
+      {teacher.portal_password_hint && (
+        <div className="rounded-lg px-3 py-2 text-xs space-y-0.5" style={{ background: "#EAF0F6" }}>
+          <div style={{ color: "#6B7B8E" }}>密碼備註</div>
+          <div className="font-mono font-semibold" style={{ color: "#1A3A5C" }}>{teacher.portal_password_hint}</div>
+        </div>
+      )}
       <div>
         <label className="block text-xs font-semibold mb-1" style={{ color: "#6B7B8E" }}>重設密碼</label>
         <input type="text" className="w-full rounded-lg border px-3 py-2 text-sm"
@@ -79,7 +93,14 @@ function TeacherPortalManageForm({ teacher, onDone, showToast }: {
           onClick={() => startTransition(async () => {
             const res = await resetClassroomPassword({ authUserId: teacher.auth_user_id!, newPassword: password });
             if (res.error) showToast(res.error, false);
-            else { showToast("密碼已重設"); onDone(); }
+            else {
+              await fetch("/api/update-teacher-hint", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ teacherId: teacher.id, hint: password }),
+              });
+              showToast("密碼已重設"); onDone();
+            }
           })}>
           {isPending ? "儲存中…" : "重設密碼"}
         </button>

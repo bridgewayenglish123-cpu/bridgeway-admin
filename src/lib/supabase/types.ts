@@ -28,6 +28,7 @@ export interface Teacher {
   email: string | null;
   notes: string | null;
   auth_user_id: string | null;
+  portal_password_hint: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -42,6 +43,7 @@ export interface Student {
   status: StudentStatus;
   current_teacher_id: string | null;
   auth_user_id: string | null;
+  portal_password_hint: string | null;
   learning_goal: string | null;
   created_at: string;
   updated_at: string;
