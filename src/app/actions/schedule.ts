@@ -20,6 +20,51 @@ export async function createScheduleRule(data: {
   end_date: string | null;
 }) {
   const supabase = createClient();
+
+  // ── 衝突檢查：同老師週幾+時間重疊 ──────────────────────────────────────────
+  if (data.teacher_id && data.weekdays.length > 0) {
+    // 找同老師的其他排課規則（Active）
+    const { data: existingRules } = await supabase
+      .from("schedule_rules")
+      .select("id, weekdays, time, duration, account_id")
+      .eq("teacher_id", data.teacher_id)
+      .eq("active_status", "Active");
+
+    const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+    const newStart = toMin(data.time);
+    const newEnd = newStart + data.duration;
+
+    for (const rule of existingRules || []) {
+      const ruleWeekdays = rule.weekdays as number[];
+      const hasOverlapDay = data.weekdays.some(d => ruleWeekdays.includes(d));
+      if (!hasOverlapDay) continue;
+
+      const ruleStart = toMin(rule.time);
+      const ruleEnd = ruleStart + (rule.duration || 0);
+      if (newStart < ruleEnd && ruleStart < newEnd) {
+        // 找帳戶名稱
+        const { data: acc } = await supabase
+          .from("accounts").select("course_label, student_id").eq("id", rule.account_id).single();
+        const { data: stu } = await supabase
+          .from("students").select("zh_name").eq("id", acc?.student_id || "").single();
+        const days = ["日","一","二","三","四","五","六"];
+        const overlapDays = data.weekdays.filter(d => ruleWeekdays.includes(d)).map(d => "週" + days[d]).join("、");
+        const endStr = String(Math.floor(newEnd / 60)).padStart(2,"0") + ":" + String(newEnd % 60).padStart(2,"0");
+        const ruleEndStr = String(Math.floor(ruleEnd / 60)).padStart(2,"0") + ":" + String(ruleEnd % 60).padStart(2,"0");
+        return {
+          error: `老師時間衝突（${overlapDays}）：
+` +
+            `新規則：${data.time}–${endStr}
+` +
+            `已有規則：${rule.time}–${ruleEndStr}（${stu?.zh_name || "?"}）
+
+` +
+            `請調整時間或選其他老師。`
+        };
+      }
+    }
+  }
+
   const now = new Date().toISOString();
   const { error } = await supabase.from("schedule_rules").insert({
     id: uid("sr"),
