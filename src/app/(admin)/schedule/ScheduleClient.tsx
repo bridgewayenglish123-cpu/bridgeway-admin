@@ -7,7 +7,7 @@ import PageIntro from "@/components/ui/PageIntro";
 import Card from "@/components/ui/Card";
 import Btn from "@/components/ui/Btn";
 import Badge from "@/components/ui/Badge";
-import { Table, Td } from "@/components/ui/Table";
+import { Table, Td, MobileCardList, MobileCard } from "@/components/ui/Table";
 import Empty from "@/components/ui/Empty";
 import RuleModal from "./RuleModal";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -317,7 +317,8 @@ ${wdLabels} ${rule.time}
             {rules.length === 0 ? "還沒有任何排課規則。" : "沒有符合條件的規則。"}
           </Empty>
         ) : (
-          <Table head={["學生 · 課程", "週幾 · 時間 · 時長", "老師", "狀態", "操作"]}>
+          <>
+          <Table head={["學生 · 課程", "週幾 · 時間 · 時長", "老師", "狀態", "操作"]} mobileCard>
             {filtered.map((rule) => {
               const acc = accountById[rule.account_id];
               const student = acc ? studentById[acc.student_id] : null;
@@ -411,6 +412,48 @@ ${wdLabels} ${rule.time}
               );
             })}
           </Table>
+
+          <MobileCardList>
+            {filtered.map((rule) => {
+              const acc = accountById[rule.account_id];
+              const student = acc ? studentById[acc.student_id] : null;
+              const teacher = teacherById[rule.teacher_id || ""];
+              const isActive = rule.active_status === "Active";
+              const remaining = getRemainingForAccount(rule.account_id);
+              const wdLabels = (rule.weekdays as number[]).sort().map((d) => `週${WD[d]}`).join("、");
+              return (
+                <MobileCard key={rule.id} faded={!isActive}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-semibold text-[14px]" style={{ color: C.navy }}>
+                        {student?.zh_name || "—"}
+                        {student?.en_name && <span className="ml-1 text-[12px] font-normal" style={{ color: C.muted }}>({student.en_name})</span>}
+                      </div>
+                      <div className="text-[12px] mt-0.5" style={{ color: C.muted }}>
+                        {acc?.course_label} · 剩 <span style={{ color: remaining <= 2 ? C.amber : C.muted }}>{remaining}</span> 堂
+                      </div>
+                    </div>
+                    <Badge tone={isActive ? "green" : "gray"}>{isActive ? "啟用" : "停用"}</Badge>
+                  </div>
+                  <div className="text-[13px]" style={{ color: C.text }}>
+                    {wdLabels} · {rule.time} · {rule.duration} 分鐘 · {teacher?.teacher_name || "—"}
+                  </div>
+                  <div className="flex gap-1 flex-wrap mt-1">
+                    {isActive && acc && (
+                      <Btn kind="good" size="sm" disabled={isPending} onClick={() => handleGenerate(rule)}>生成排課</Btn>
+                    )}
+                    {isActive && acc && (
+                      <Btn kind="ghost" size="sm" disabled={isPending} onClick={() => handleClearAndRegen(rule)}>清除重排</Btn>
+                    )}
+                    <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "edit", rule })}>編輯</Btn>
+                    <Btn kind="ghost" size="sm" onClick={() => handleToggle(rule)}>{isActive ? "停用" : "啟用"}</Btn>
+                    <Btn kind="danger" size="sm" onClick={() => handleDelete(rule)}>刪除</Btn>
+                  </div>
+                </MobileCard>
+              );
+            })}
+          </MobileCardList>
+          </>
         )}
       </Card>
 
