@@ -411,9 +411,9 @@ export default function TeachersClient({ teachers, stats }: Props) {
                 老師：<strong>{t.teacher_name}</strong>
               </div>
               {hasAccount ? (
-                <TeacherPortalManageForm teacher={t} onDone={closeModal} onToast={showToast} />
+                <TeacherPortalManageForm teacher={t} onDone={closeModal} showToast={showToast} />
               ) : (
-                <TeacherPortalCreateForm teacher={t} onDone={closeModal} onToast={showToast} />
+                <TeacherPortalCreateForm teacher={t} onDone={closeModal} showToast={showToast} />
               )}
             </div>
           </div>
