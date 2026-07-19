@@ -205,7 +205,7 @@ ${transcript}
     "headline": "Annie, you made real progress today.",
     "body": "Specific, warm English analysis, 2-4 sentences."
   },
-  "next_focus": "下堂課建議重點，給老師看的純文字",
+  "next_focus": "Next lesson focus written in English only — specific teaching suggestions for the next session",
   "reflection_question": {
     "zh": "針對本課學習點的語言輸出練習題（用中文說明）。必須是造句、口說或寫作練習，例如：用今天學的單字造一個關於自己生活的句子，或用英文寫3句描述最近做的事（用過去式）。禁止問課文情節或故事內容。",
     "en": "A language output practice prompt directly tied to today's learning point. Must be a speaking or writing exercise, e.g. use a vocabulary word in a sentence about your own life, or write 3 sentences about something you did recently using past tense. Do NOT ask about the story plot or characters."
