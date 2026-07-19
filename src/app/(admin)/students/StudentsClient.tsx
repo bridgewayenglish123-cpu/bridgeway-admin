@@ -1,12 +1,10 @@
 "use client";
 
 // ── Classroom 建立帳號表單 ────────────────────────────────────────────────────
-function ClassroomCreateForm({ student, onDone }: { student: { id: string; zh_name: string; zoom_email: string | null }; onDone: () => void }) {
+function ClassroomCreateForm({ student, onDone, onToast }: { student: { id: string; zh_name: string; zoom_email: string | null }; onDone: () => void; onToast: (msg: string, ok?: boolean) => void }) {
   const [email, setEmail] = useState(student.zoom_email || "");
   const [password, setPassword] = useState("");
   const [isPending, startTransition] = useTransition();
-  const { showToast } = useToast();
-
   return (
     <div className="space-y-3">
       <div>
@@ -28,8 +26,8 @@ function ClassroomCreateForm({ student, onDone }: { student: { id: string; zh_na
           style={{ background: "#1A3A5C" }}
           onClick={() => startTransition(async () => {
             const res = await createClassroomAccount({ studentId: student.id, email, password, zhName: student.zh_name });
-            if (res.error) showToast(res.error, false);
-            else { showToast(`${student.zh_name} 的 Classroom 帳號已開通`); onDone(); }
+            if (res.error) onToast(res.error, false);
+            else { onToast(`${student.zh_name} 的 Classroom 帳號已開通`); onDone(); }
           })}>
           {isPending ? "開通中…" : "開通帳號"}
         </button>
@@ -39,11 +37,9 @@ function ClassroomCreateForm({ student, onDone }: { student: { id: string; zh_na
 }
 
 // ── Classroom 管理帳號表單 ────────────────────────────────────────────────────
-function ClassroomManageForm({ student, onDone }: { student: { id: string; zh_name: string; auth_user_id: string | null }; onDone: () => void }) {
+function ClassroomManageForm({ student, onDone, onToast }: { student: { id: string; zh_name: string; auth_user_id: string | null }; onDone: () => void; onToast: (msg: string, ok?: boolean) => void }) {
   const [password, setPassword] = useState("");
   const [isPending, startTransition] = useTransition();
-  const { showToast } = useToast();
-
   return (
     <div className="space-y-3">
       <div className="rounded-lg px-3 py-2 text-xs" style={{ background: "#E8F5E9", color: "#2E7D32" }}>
@@ -62,8 +58,8 @@ function ClassroomManageForm({ student, onDone }: { student: { id: string; zh_na
           onClick={() => startTransition(async () => {
             if (!confirm("確定要刪除此帳號？")) return;
             const res = await deleteClassroomAccount({ studentId: student.id, authUserId: student.auth_user_id! });
-            if (res.error) showToast(res.error, false);
-            else { showToast("帳號已刪除"); onDone(); }
+            if (res.error) onToast(res.error, false);
+            else { onToast("帳號已刪除"); onDone(); }
           })}>刪除帳號</button>
         <button
           disabled={!password || password.length < 8 || !student.auth_user_id || isPending}
@@ -71,8 +67,8 @@ function ClassroomManageForm({ student, onDone }: { student: { id: string; zh_na
           style={{ background: "#1A3A5C" }}
           onClick={() => startTransition(async () => {
             const res = await resetClassroomPassword({ authUserId: student.auth_user_id!, newPassword: password });
-            if (res.error) showToast(res.error, false);
-            else { showToast("密碼已重設"); onDone(); }
+            if (res.error) onToast(res.error, false);
+            else { onToast("密碼已重設"); onDone(); }
           })}>
           {isPending ? "儲存中…" : "重設密碼"}
         </button>
@@ -812,9 +808,9 @@ export default function StudentsClient({ students, teachers, accounts, lessons, 
                 學生：<strong>{s.zh_name}</strong>
               </div>
               {hasAccount ? (
-                <ClassroomManageForm student={s} onDone={closeModal} />
+                <ClassroomManageForm student={s} onDone={closeModal} onToast={showToast} />
               ) : (
-                <ClassroomCreateForm student={s} onDone={closeModal} />
+                <ClassroomCreateForm student={s} onDone={closeModal} onToast={showToast} />
               )}
             </div>
           </div>
