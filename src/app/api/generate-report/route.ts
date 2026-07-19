@@ -1,5 +1,6 @@
 import "server-only";
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import Anthropic from "@anthropic-ai/sdk";
 import { Resend } from "resend";
 import { nanoid } from "nanoid";
