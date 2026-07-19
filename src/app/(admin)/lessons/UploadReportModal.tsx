@@ -25,13 +25,55 @@ export default function UploadReportModal({
   onGenerated,
   onClose,
 }: Props) {
+  const [mode, setMode] = useState<"vtt" | "manual">("vtt");
   const [note, setNote] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // 手動填寫欄位
+  const [manualVocab, setManualVocab] = useState("");
+  const [manualPhrases, setManualPhrases] = useState("");
+  const [manualErrors, setManualErrors] = useState("");
+  const [manualPerformance, setManualPerformance] = useState("");
+  const [manualNextFocus, setManualNextFocus] = useState("");
+
   const isRegenerate = !!existingReportId;
   const busy = status === "uploading" || status === "analyzing";
+
+  const handleManualSubmit = async () => {
+    if (!manualPerformance.trim()) return;
+    setErrorMsg(null);
+    try {
+      setStatus("analyzing");
+      const res = await fetch("/api/generate-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lessonId,
+          manualInput: {
+            vocabulary: manualVocab,
+            phrases: manualPhrases,
+            errors: manualErrors,
+            performance: manualPerformance,
+            nextFocus: manualNextFocus,
+            teacherNote: note,
+          },
+          existingReportId,
+        }),
+      });
+      if (res.ok) {
+        setStatus("done");
+        onGenerated();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setErrorMsg(typeof data?.error === "string" ? data.error : null);
+        setStatus("error");
+      }
+    } catch {
+      setStatus("error");
+    }
+  };
 
   const handleSubmit = async () => {
     if (!file) return;
@@ -81,11 +123,26 @@ export default function UploadReportModal({
           {isRegenerate ? "重新生成 AI 學習報告" : "生成 AI 學習報告"}
         </h3>
 
+        {/* 模式切換 */}
+        <div className="flex gap-1 rounded-lg p-1" style={{ background: "#EAF0F6" }}>
+          {(["vtt", "manual"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              disabled={busy}
+              className="flex-1 rounded-md py-1.5 text-xs font-semibold transition"
+              style={{
+                background: mode === m ? C.navy : "transparent",
+                color: mode === m ? "#fff" : C.muted,
+              }}
+            >
+              {m === "vtt" ? "上傳 VTT（AI 生成）" : "手動填寫"}
+            </button>
+          ))}
+        </div>
+
         {isRegenerate && (
-          <div
-            className="rounded-lg p-3 text-xs"
-            style={{ background: C.amberSoft, color: C.amber }}
-          >
+          <div className="rounded-lg p-3 text-xs" style={{ background: C.amberSoft, color: C.amber }}>
             重新生成將覆蓋現有報告。
           </div>
         )}
@@ -125,6 +182,93 @@ export default function UploadReportModal({
           </>
         ) : (
           <>
+            {mode === "manual" ? (
+              /* ── 手動填寫模式 ── */
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
+                    學生課堂表現 <span style={{ color: C.red }}>*</span>
+                  </label>
+                  <textarea
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    style={{ borderColor: C.line, color: C.text, minHeight: 80, resize: "vertical" }}
+                    placeholder="例：今天主動提問很多，閱讀理解很強，過去式動詞錯了幾次..."
+                    value={manualPerformance}
+                    onChange={(e) => setManualPerformance(e.target.value)}
+                    disabled={busy}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
+                    本課重點單字（逗號分隔，選填）
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    style={{ borderColor: C.line, color: C.text }}
+                    placeholder="例：camouflage, predator, ancient"
+                    value={manualVocab}
+                    onChange={(e) => setManualVocab(e.target.value)}
+                    disabled={busy}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
+                    本課重點片語（逗號分隔，選填）
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    style={{ borderColor: C.line, color: C.text }}
+                    placeholder="例：set off, travel light, roam around"
+                    value={manualPhrases}
+                    onChange={(e) => setManualPhrases(e.target.value)}
+                    disabled={busy}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
+                    需要加強的地方（選填）
+                  </label>
+                  <textarea
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    style={{ borderColor: C.line, color: C.text, minHeight: 60, resize: "vertical" }}
+                    placeholder="例：過去式動詞用錯 4 次、比較句型不完整"
+                    value={manualErrors}
+                    onChange={(e) => setManualErrors(e.target.value)}
+                    disabled={busy}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
+                    下堂課建議（選填）
+                  </label>
+                  <textarea
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    style={{ borderColor: C.line, color: C.text, minHeight: 60, resize: "vertical" }}
+                    placeholder="例：下堂課練習過去式口說，請學生準備 3 句話描述上週做的事"
+                    value={manualNextFocus}
+                    onChange={(e) => setManualNextFocus(e.target.value)}
+                    disabled={busy}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
+                    老師手記（選填）
+                  </label>
+                  <textarea
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    style={{ borderColor: C.line, color: C.text, minHeight: 60, resize: "vertical" }}
+                    placeholder="給學生的額外留言"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    disabled={busy}
+                  />
+                </div>
+              </div>
+            ) : (
+              /* ── VTT 模式 ── */
+              <>
             {/* 老師手記 */}
             <div>
               <label

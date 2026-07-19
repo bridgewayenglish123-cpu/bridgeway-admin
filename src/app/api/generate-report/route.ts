@@ -115,7 +115,14 @@ export async function POST(request: Request) {
         ? teacherRel[0]?.teacher_name
         : teacherRel?.teacher_name) ?? "老師";
 
-    const transcript = vttToPlainText(vttContent);
+    const transcript = vttContent
+    ? vttToPlainText(vttContent)
+    : `[手動填寫模式 - 無錄音檔]
+學生課堂表現：${manualInput?.performance || ""}
+本課重點單字：${manualInput?.vocabulary || "（老師未填）"}
+本課重點片語：${manualInput?.phrases || "（老師未填）"}
+需要加強的地方：${manualInput?.errors || "（老師未填）"}
+下堂課建議：${manualInput?.nextFocus || "（老師未填）"}`;
 
     const previousSummary = (previousReports ?? []).map((r: any) => ({
       date: Array.isArray(r.lesson) ? r.lesson[0]?.date : r.lesson?.date,
