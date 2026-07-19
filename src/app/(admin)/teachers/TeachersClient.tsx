@@ -118,7 +118,7 @@ import PageIntro from "@/components/ui/PageIntro";
 import Card from "@/components/ui/Card";
 import Btn from "@/components/ui/Btn";
 import Badge from "@/components/ui/Badge";
-import { Table, Td } from "@/components/ui/Table";
+import { Table, Td, MobileCardList, MobileCard } from "@/components/ui/Table";
 import Empty from "@/components/ui/Empty";
 import {
   createTeacher, updateTeacher, setTeacherStatus, deleteTeacher,
@@ -342,7 +342,8 @@ export default function TeachersClient({ teachers, stats }: Props) {
           ) : null
         }
       >
-        <Table head={["姓名", "代碼", "Email", "狀態", "完課", "待上", "排課規則", "操作"]}>
+        <>
+        <Table head={["姓名", "代碼", "Email", "狀態", "完課", "待上", "排課規則", "操作"]} mobileCard>
           {group.map((t) => {
             const s = stats[t.id] || { total: 0, completed: 0, upcoming: 0, activeRules: 0 };
             const isActive = t.active_status === "Active";
@@ -380,6 +381,42 @@ export default function TeachersClient({ teachers, stats }: Props) {
             );
           })}
         </Table>
+
+        <MobileCardList>
+          {group.map((t) => {
+            const s = stats[t.id] || { total: 0, completed: 0, upcoming: 0, activeRules: 0 };
+            const isActive = t.active_status === "Active";
+            return (
+              <MobileCard key={t.id} faded={!isActive}>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="font-semibold text-[14px]" style={{ color: C.navy }}>{t.teacher_name}</div>
+                    <div className="text-[12px] mt-0.5" style={{ color: C.muted }}>{t.email || "—"}</div>
+                  </div>
+                  <Badge tone={isActive ? "green" : "gray"}>{isActive ? "啟用中" : "已停用"}</Badge>
+                </div>
+                <div className="flex gap-4 text-[12px]" style={{ color: C.muted }}>
+                  <span>完課 <strong style={{ color: C.navy }}>{s.completed}</strong></span>
+                  <span>待上 <strong style={{ color: s.upcoming > 0 ? C.gold : C.muted }}>{s.upcoming}</strong></span>
+                  <span>排課規則 <strong style={{ color: s.activeRules > 0 ? C.navy : C.muted }}>{s.activeRules}</strong></span>
+                </div>
+                <div className="flex gap-1 flex-wrap mt-1">
+                  <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "edit", teacher: t })}>編輯</Btn>
+                  <Btn kind={t.auth_user_id ? "good" : "ghost"} size="sm"
+                    onClick={() => setModal({ kind: "portal", teacher: t })}>
+                    {t.auth_user_id ? "🎓 Portal" : "開通 Portal"}
+                  </Btn>
+                  {isActive
+                    ? <Btn kind="ghost" size="sm" onClick={() => handleDeactivate(t)}>停用</Btn>
+                    : <Btn kind="ghost" size="sm" onClick={() => handleActivate(t)}>啟用</Btn>
+                  }
+                  <Btn kind="danger" size="sm" onClick={() => handleDelete(t)}>刪除</Btn>
+                </div>
+              </MobileCard>
+            );
+          })}
+        </MobileCardList>
+        </>
       </Card>
     );
   };
