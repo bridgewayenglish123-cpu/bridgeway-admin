@@ -47,12 +47,12 @@ export async function POST(request: Request) {
   const resend = new Resend(process.env.RESEND_API_KEY!);
 
   try {
-    const { lessonId, vttContent, teacherNote, existingReportId } =
+    const { lessonId, vttContent, teacherNote, existingReportId, manualInput } =
       await request.json();
 
-    if (!lessonId || !vttContent) {
+    if (!lessonId || (!vttContent && !manualInput)) {
       return NextResponse.json(
-        { error: "lessonId 和 vttContent 為必填" },
+        { error: "lessonId 和 vttContent 或 manualInput 為必填" },
         { status: 400 }
       );
     }
