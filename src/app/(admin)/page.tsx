@@ -33,6 +33,7 @@ async function loadData() {
     lessons: (lessonsRes.data || []) as Lesson[],
     remit: (remitRes.data || []) as RemittancePeriod[],
     phpRate: metaRes.data?.php_rate || 1.8,
+    emailEnabled: metaRes.data?.email_notifications_enabled ?? false,
     scheduleRules: (rulesRes.data || []) as ScheduleRule[],
     reportedLessonIds: new Set(
       ((reportsRes.data || []) as { lesson_id: string }[]).map((r) => r.lesson_id)
@@ -41,7 +42,7 @@ async function loadData() {
 }
 
 export default async function DashboardPage() {
-  const { teachers, students, accounts, lessons, remit, phpRate, scheduleRules, reportedLessonIds } = await loadData();
+  const { teachers, students, accounts, lessons, remit, phpRate, scheduleRules, reportedLessonIds, emailEnabled } = await loadData();
 
   const today = todayYMD();
   const wk = weekRange();
@@ -242,6 +243,9 @@ export default async function DashboardPage() {
           C.gold
         )}
       </div>
+
+      {/* Email 通知開關 */}
+      <EmailToggle enabled={emailEnabled} />
 
       {/* 今日課程 */}
       <DashboardActions
