@@ -40,6 +40,8 @@ export interface Student {
   age: string | null;
   status: StudentStatus;
   current_teacher_id: string | null;
+  auth_user_id: string | null;
+  learning_goal: string | null;
   created_at: string;
   updated_at: string;
 }

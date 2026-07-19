@@ -8,6 +8,7 @@ import DetailModal from "./DetailModal";
 import PageIntro from "@/components/ui/PageIntro";
 import Card from "@/components/ui/Card";
 import Btn from "@/components/ui/Btn";
+import { createClassroomAccount, resetClassroomPassword, deleteClassroomAccount } from "@/app/actions/classroom";
 import Badge from "@/components/ui/Badge";
 import { Table, Td } from "@/components/ui/Table";
 import Empty from "@/components/ui/Empty";
@@ -36,7 +37,8 @@ type ModalState =
   | { kind: "detail"; student: Student }
   | { kind: "csv" }
   | { kind: "confirm-delete-warn"; student: Student }
-  | { kind: "confirm-delete-final"; student: Student };
+  | { kind: "confirm-delete-final"; student: Student }
+  | { kind: "classroom"; student: Student };
 
 const STATUS_LABEL: Record<StudentStatus, string> = {
   Active: "在學", Paused: "暫停中", Closed: "已結束",
@@ -595,6 +597,10 @@ export default function StudentsClient({ students, teachers, accounts, lessons, 
                   <div className="flex gap-1.5 flex-wrap">
                     <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "detail", student: s })}>查看</Btn>
                     <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "edit", student: s })}>編輯</Btn>
+                    <Btn kind={s.auth_user_id ? "good" : "ghost"} size="sm"
+                      onClick={() => setModal({ kind: "classroom", student: s })}>
+                      {s.auth_user_id ? "🎓 已開通" : "開通 Classroom"}
+                    </Btn>
                     <Btn kind="danger" size="sm" onClick={() => handleDeleteConfirm(s)}>刪除</Btn>
                   </div>
                 </Td>
