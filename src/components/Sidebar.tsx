@@ -153,6 +153,24 @@ export default function Sidebar({ lastBackupAt }: SidebarProps = {}) {
           className="px-5 py-4 space-y-2.5"
           style={{ borderTop: `1px solid ${C.navySoft}` }}
         >
+          {/* 切換系統 */}
+          <div className="space-y-1 mb-2">
+            <div className="text-xs mb-1.5 px-1" style={{ color: "#5E769A", letterSpacing: "0.05em" }}>切換系統</div>
+            {[
+              { label: "Classroom", href: "https://app.bridgewayenglish.net", icon: "◈" },
+              { label: "Teacher Portal", href: "https://teacher.bridgewayenglish.net", icon: "◉" },
+              { label: "Reading", href: "https://bridgewayreading.com", icon: "◫" },
+            ].map(({ label, href, icon }) => (
+              <a key={href} href={href} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded text-xs transition-opacity hover:opacity-80"
+                style={{ color: "#7A93B8", border: "1px solid #16314F" }}>
+                <span>{icon}</span>
+                <span style={{ letterSpacing: "0.03em" }}>{label}</span>
+                <span className="ml-auto text-[10px]" style={{ color: "#4A6280" }}>↗</span>
+              </a>
+            ))}
+          </div>
+
           <button
             onClick={handleExportSnapshot}
             className="w-full px-2 py-2 rounded text-xs transition-opacity hover:opacity-80 mb-2"
