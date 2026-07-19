@@ -629,7 +629,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
             })}
           </Table>
 
-          {/* 手機卡片式 */}
+
           <MobileCardList>
             {filtered.map((l) => {
               const student = studentById[l.student_id];
