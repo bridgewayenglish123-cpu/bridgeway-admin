@@ -1,5 +1,24 @@
 "use server";
 
+// 時間字串轉分鐘數（"10:30" → 630）
+function timeToMinutes(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+// 判斷兩個課程是否時間重疊
+function isTimeOverlap(
+  time1: string, duration1: number,
+  time2: string, duration2: number
+): boolean {
+  const start1 = timeToMinutes(time1);
+  const end1 = start1 + duration1;
+  const start2 = timeToMinutes(time2);
+  const end2 = start2 + duration2;
+  return start1 < end2 && start2 < end1;
+}
+
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { TeacherType, BillingType } from "@/lib/supabase/types";
@@ -193,25 +212,31 @@ export async function bookFlexLesson(data: {
 }) {
   const supabase = createClient();
 
-  // 1a. 同學生時段衝突(跨帳戶)
+  // 1a. 同學生時段衝突(跨帳戶，含時長重疊檢查)
   const { data: studentLessons } = await supabase
     .from("lessons")
-    .select("id,account_id,teacher_id")
+    .select("id,account_id,teacher_id,time,duration")
     .eq("student_id", data.student_id)
     .eq("is_active", true)
     .eq("date", data.date)
-    .eq("time", data.time);
+    .in("status", ["scheduled", "completed"]);
 
-  if (studentLessons && studentLessons.length > 0) {
-    const dup = studentLessons[0];
+  const studentConflict = (studentLessons || []).find(l =>
+    l.time && l.duration && isTimeOverlap(data.time, data.duration, l.time, l.duration)
+  );
+
+  if (studentConflict) {
     const { data: dupAcc } = await supabase
-      .from("accounts").select("course_label").eq("id", dup.account_id).single();
+      .from("accounts").select("course_label").eq("id", studentConflict.account_id).single();
     const { data: dupTeacher } = await supabase
-      .from("teachers").select("teacher_name").eq("id", dup.teacher_id || "").single();
+      .from("teachers").select("teacher_name").eq("id", studentConflict.teacher_id || "").single();
+    const endTime = new Date(`2000-01-01T${data.time}`);
+    endTime.setMinutes(endTime.getMinutes() + data.duration);
+    const endStr = endTime.toTimeString().slice(0, 5);
     return {
       ok: false,
-      error: "此學生在 " + data.date + " " + data.time + " 已有另一堂課:\n" +
-        (dupAcc?.course_label || "另一帳戶") + " · " + (dupTeacher?.teacher_name || "未指派老師") +
+      error: "此學生在 " + data.date + " " + data.time + "–" + endStr + " 與另一堂課重疊:\n" +
+        (dupAcc?.course_label || "另一帳戶") + " · " + studentConflict.time + " · " + (dupTeacher?.teacher_name || "未指派老師") +
         "\n\n請換時間,或先取消原本那堂。",
     };
   }
@@ -220,23 +245,32 @@ export async function bookFlexLesson(data: {
   if (data.teacher_id) {
     const { data: teacherLessons } = await supabase
       .from("lessons")
-      .select("id,student_id")
+      .select("id,student_id,time,duration")
       .eq("teacher_id", data.teacher_id)
       .eq("is_active", true)
       .eq("date", data.date)
-      .eq("time", data.time);
+      .in("status", ["scheduled", "completed"]);
 
-    if (teacherLessons && teacherLessons.length > 0) {
-      const tDup = teacherLessons[0];
+    const teacherConflict = (teacherLessons || []).find(l =>
+      l.time && l.duration && isTimeOverlap(data.time, data.duration, l.time, l.duration)
+    );
+
+    if (teacherConflict) {
       const { data: dupStudent } = await supabase
-        .from("students").select("zh_name").eq("id", tDup.student_id).single();
-      const { data: teacher } = await supabase
+        .from("students").select("zh_name").eq("id", teacherConflict.student_id).single();
+      const { data: teacherData } = await supabase
         .from("teachers").select("teacher_name").eq("id", data.teacher_id).single();
+      const endTime = new Date(\`2000-01-01T\${data.time}\`);
+      endTime.setMinutes(endTime.getMinutes() + data.duration);
+      const endStr = endTime.toTimeString().slice(0, 5);
+      const existEnd = new Date(\`2000-01-01T\${teacherConflict.time}\`);
+      existEnd.setMinutes(existEnd.getMinutes() + (teacherConflict.duration || 0));
       return {
         ok: false,
-        error: (teacher?.teacher_name || "此老師") + " 在 " + data.date + " " + data.time + " 已排另一堂:\n" +
-          "學生:" + (dupStudent?.zh_name || "未知") +
-          "\n\n請換時間或換老師。",
+        error: (teacherData?.teacher_name || "此老師") + " 在 " + data.date + " 有時間重疊:\n" +
+          "新課：" + data.time + "–" + endStr + "\n" +
+          "已排：" + teacherConflict.time + "–" + existEnd.toTimeString().slice(0, 5) +
+          " (" + (dupStudent?.zh_name || "未知") + ")\n\n請換時間或換老師。",
       };
     }
   }

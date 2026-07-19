@@ -183,15 +183,26 @@ export async function generateLessonsForAccount(accountId: string): Promise<{
   // 預先載入所有衝突資料(跨學生老師衝突)
   const { data: allLessonsForConflict } = await supabase
     .from("lessons")
-    .select("id,student_id,teacher_id,date,time")
-    .eq("is_active", true);
+    .select("id,student_id,teacher_id,date,time,duration")
+    .eq("is_active", true)
+    .in("status", ["scheduled", "completed"]);
 
-  // teacherBusy: teacher_id + date + time → 學生名
-  const teacherBusyMap = new Map<string, string>();
+  // teacherBusy: teacher_id + date → [{time, duration, student_id}]
+  const teacherBusyMap = new Map<string, { time: string; duration: number; student_id: string }[]>();
   for (const l of allLessonsForConflict || []) {
-    if (l.teacher_id) {
-      teacherBusyMap.set(l.teacher_id + "__" + l.date + "__" + l.time, l.student_id);
+    if (l.teacher_id && l.time && l.duration) {
+      const key = l.teacher_id + "__" + l.date;
+      if (!teacherBusyMap.has(key)) teacherBusyMap.set(key, []);
+      teacherBusyMap.get(key)!.push({ time: l.time, duration: l.duration, student_id: l.student_id });
     }
+  }
+
+  // 時間重疊判斷
+  function overlapCheck(time1: string, dur1: number, time2: string, dur2: number): boolean {
+    const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+    const s1 = toMin(time1), e1 = s1 + dur1;
+    const s2 = toMin(time2), e2 = s2 + dur2;
+    return s1 < e2 && s2 < e1;
   }
 
   const skipped: string[] = [];
@@ -224,14 +235,20 @@ export async function generateLessonsForAccount(accountId: string): Promise<{
         continue;
       }
 
-      // 同老師時段衝突 → 跳過
+      // 同老師時段衝突(含時長重疊) → 跳過
       if (rule.teacher_id) {
-        const teacherKey = rule.teacher_id + "__" + cursor + "__" + rule.time;
-        if (teacherBusyMap.has(teacherKey)) {
-          skipped.push(cursor + " " + rule.time + " (老師已有課)");
+        const dayKey = rule.teacher_id + "__" + cursor;
+        const busySlots = teacherBusyMap.get(dayKey) || [];
+        const hasOverlap = busySlots.some(slot =>
+          overlapCheck(rule.time, rule.duration, slot.time, slot.duration)
+        );
+        if (hasOverlap) {
+          skipped.push(cursor + " " + rule.time + " (老師時段重疊)");
           continue;
         }
-        teacherBusyMap.set(teacherKey, account.student_id);
+        // 加入已排紀錄
+        if (!teacherBusyMap.has(dayKey)) teacherBusyMap.set(dayKey, []);
+        teacherBusyMap.get(dayKey)!.push({ time: rule.time, duration: rule.duration, student_id: account.student_id });
       }
 
       existingKeys.add(key);
