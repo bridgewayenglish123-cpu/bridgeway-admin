@@ -136,8 +136,12 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
       });
     }
 
-    // 排序:date asc, time asc
+    // 排序：全部 tab → 最新在前；其他 tab → 最舊在前（方便查看今日/本週/逾期）
     return [...list].sort((a, b) => {
+      if (tab === "all") {
+        if (a.date !== b.date) return b.date.localeCompare(a.date);
+        return (b.time || "").localeCompare(a.time || "");
+      }
       if (a.date !== b.date) return a.date.localeCompare(b.date);
       return (a.time || "").localeCompare(b.time || "");
     });
