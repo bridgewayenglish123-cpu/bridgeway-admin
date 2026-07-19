@@ -8,7 +8,7 @@ import { calcPeriodRows } from "./RemitClient";
 import type { Teacher, Account, Lesson, RemittancePeriod, RemittanceExtra } from "@/lib/supabase/types";
 import Btn from "@/components/ui/Btn";
 import Badge from "@/components/ui/Badge";
-import { Table, Td } from "@/components/ui/Table";
+import { Table, Td, MobileCardList, MobileCard } from "@/components/ui/Table";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { markPaid, deleteExtra } from "@/app/actions/remit";
 
@@ -46,7 +46,8 @@ export function TeacherBreakdownTable({
   }
 
   return (
-    <Table head={["老師", "試聽 25分", "短課 25分", "完整 55分", "總堂", "老師應得 NTD", "≈ PHP"]}>
+    <>
+    <Table head={["老師", "試聽 25分", "短課 25分", "完整 55分", "總堂", "老師應得 NTD", "≈ PHP"]} mobileCard>
       {rows.map((r) => (
         <tr key={r.teacherId} style={{ borderBottom: `1px solid ${C.line}` }}>
           <Td><span className="font-medium" style={{ color: C.navy }}>{r.teacherName}</span></Td>
@@ -75,6 +76,47 @@ export function TeacherBreakdownTable({
         <Td><span className="font-semibold" style={{ color: C.gold }}>₱ {money(totalPhp)}</span></Td>
       </tr>
     </Table>
+
+    <MobileCardList>
+      {rows.map((r) => (
+        <MobileCard key={r.teacherId}>
+          <div className="flex items-center justify-between">
+            <div className="font-semibold text-[14px]" style={{ color: C.navy }}>{r.teacherName}</div>
+            <div className="text-right">
+              <div className="font-semibold text-[14px]" style={{ color: C.navy }}>NT$ {money(r.payoutNtd + r.hanneNtd)}</div>
+              <div className="text-[12px]" style={{ color: C.gold }}>₱ {money(Math.round((r.payoutNtd + r.hanneNtd) * phpRate))}</div>
+            </div>
+          </div>
+          <div className="flex gap-3 text-[12px] mt-1" style={{ color: C.muted }}>
+            {r.trial > 0 && <span>試聽 {r.trial}</span>}
+            {r.s25 > 0 && <span>短課 {r.s25}</span>}
+            {r.l55 > 0 && <span>完整 {r.l55}</span>}
+            <span>共 {r.total} 堂</span>
+          </div>
+        </MobileCard>
+      ))}
+      {hanneCommissionNtd > 0 && (
+        <MobileCard>
+          <div className="flex items-center justify-between">
+            <div className="text-[13px]" style={{ color: C.amber }}>Hanne 佣金</div>
+            <div className="text-right">
+              <div className="font-semibold text-[13px]" style={{ color: C.amber }}>NT$ {money(hanneCommissionNtd)}</div>
+              <div className="text-[12px]" style={{ color: C.amber }}>₱ {money(Math.round(hanneCommissionNtd * phpRate))}</div>
+            </div>
+          </div>
+        </MobileCard>
+      )}
+      <div className="rounded-xl p-3 mt-1" style={{ background: "#EAF0F6" }}>
+        <div className="flex items-center justify-between">
+          <div className="font-semibold text-[13px]" style={{ color: C.navy }}>基本小計 · {lessonCount} 堂</div>
+          <div className="text-right">
+            <div className="font-semibold" style={{ color: C.navy }}>NT$ {money(totalPayoutNtd)}</div>
+            <div className="text-[12px]" style={{ color: C.gold }}>₱ {money(totalPhp)}</div>
+          </div>
+        </div>
+      </div>
+    </MobileCardList>
+    </>
   );
 }
 
