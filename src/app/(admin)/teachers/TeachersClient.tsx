@@ -1,4 +1,6 @@
 "use client";
+import { resetClassroomPassword } from "@/app/actions/classroom";
+import { createTeacherPortalAccount, deleteTeacherPortalAccount } from "@/app/actions/classroom";
 
 // ── Teacher Portal 建立帳號 ──────────────────────────────────────────────────
 function TeacherPortalCreateForm({ teacher, onDone, showToast }: {
