@@ -10,7 +10,7 @@ import PageIntro from "@/components/ui/PageIntro";
 import Card from "@/components/ui/Card";
 import Btn from "@/components/ui/Btn";
 import Badge from "@/components/ui/Badge";
-import { Table, Td } from "@/components/ui/Table";
+import { Table, Td, MobileCardList, MobileCard, MobileRow } from "@/components/ui/Table";
 import Empty from "@/components/ui/Empty";
 import CancelModal from "./CancelModal";
 import SubstituteModal from "./SubstituteModal";
@@ -428,7 +428,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
              "沒有符合條件的課程。"}
           </Empty>
         ) : (
-          <Table head={["", "日期", "時間", "學生", "老師", "類型", "時長", "狀態", "費用", "備註", "操作"]}>
+          <Table head={["", "日期", "時間", "學生", "老師", "類型", "時長", "狀態", "費用", "備註", "操作"]} mobileCard>
             {filtered.map((l) => {
               const student = studentById[l.student_id];
               const teacher = teacherById[l.teacher_id || ""];
@@ -628,6 +628,66 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
               );
             })}
           </Table>
+
+          {/* 手機卡片式 */}
+          <MobileCardList>
+            {filtered.map((l) => {
+              const student = studentById[l.student_id];
+              const teacher = teacherById[l.teacher_id || ""];
+              const snap = l.payout_snapshot || {} as PayoutSnapshot;
+              const leeFee = effectiveLeeCommission(l);
+              const isCompleted = l.status === "completed";
+              const isCancelled = l.status === "cancelled";
+              const isScheduled = l.status === "scheduled";
+              const existingReportId = l.lesson_reports?.[0]?.id;
+              return (
+                <MobileCard key={l.id} faded={isCancelled} selected={selected.has(l.id)}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-semibold text-[14px]" style={{ color: l.date < today && isScheduled ? C.red : C.navy }}>
+                        {l.date.slice(5).replace("-", "/")} {l.time || ""}
+                      </div>
+                      <div className="text-[13px]" style={{ color: C.text }}>{student?.zh_name || "—"}</div>
+                      <div className="text-[12px]" style={{ color: C.muted }}>{teacher?.teacher_name || "—"}</div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <Badge tone={isCompleted ? "green" : isCancelled ? "gray" : l.date < today ? "red" : "navy"}>
+                        {isCompleted ? "已完成" : isCancelled ? "已取消" : l.date < today ? "逾期" : "待上"}
+                      </Badge>
+                      <Badge tone={CLASS_TYPE_TONE[l.class_type] || "gray"}>
+                        {CLASS_TYPE_LABEL[l.class_type] || l.class_type}
+                      </Badge>
+                    </div>
+                  </div>
+                  {!isCancelled && (
+                    <div className="text-[12px] flex gap-3" style={{ color: C.muted }}>
+                      <span>{l.duration ? l.duration + " 分" : "—"}</span>
+                      <span>師 {money(snap.teacher_payout_ntd)}</span>
+                      <span style={{ color: C.green }}>Lee {money(leeFee)}</span>
+                    </div>
+                  )}
+                  <div className="flex gap-1 flex-wrap mt-1">
+                    {isScheduled && (
+                      <>
+                        <Btn kind="good" size="sm" disabled={isPending} onClick={() => handleComplete(l.id)}>完成</Btn>
+                        <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "cancel", lesson: l })}>取消</Btn>
+                        <Btn kind="danger" size="sm" onClick={() => handleDeleteLesson(l)}>刪除</Btn>
+                      </>
+                    )}
+                    {isCompleted && !existingReportId && (
+                      <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "upload", lesson: l })}>生成報告</Btn>
+                    )}
+                    {isCompleted && existingReportId && (
+                      <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "upload", lesson: l, existingReportId })}>重新生成</Btn>
+                    )}
+                    {isCancelled && (
+                      <Btn kind="ghost" size="sm" disabled={isPending} onClick={() => handleUncancel(l.id)}>撤銷取消</Btn>
+                    )}
+                  </div>
+                </MobileCard>
+              );
+            })}
+          </MobileCardList>
         )}
       </Card>
 
