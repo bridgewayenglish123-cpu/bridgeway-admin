@@ -10,7 +10,7 @@ import PageIntro from "@/components/ui/PageIntro";
 import Card from "@/components/ui/Card";
 import Btn from "@/components/ui/Btn";
 import Badge from "@/components/ui/Badge";
-import { Table, Td } from "@/components/ui/Table";
+import { Table, Td, MobileCardList, MobileCard, MobileRow } from "@/components/ui/Table";
 import Empty from "@/components/ui/Empty";
 import { money, todayYMD } from "@/lib/utils";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -872,7 +872,7 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
             {accounts.length === 0 ? "還沒有任何課程帳戶。點右上角開課。" : "沒有符合條件的帳戶。"}
           </Empty>
         ) : (
-          <Table head={["", "學生", "課程", "狀態", "進度", "剩餘", "操作"]}>
+          <Table head={["", "學生", "課程", "狀態", "進度", "剩餘", "操作"]} mobileCard>
             {filtered.map((acc) => {
               const st = getStatus(acc);
               const student = studentById[acc.student_id];
@@ -978,6 +978,50 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
               );
             })}
           </Table>
+
+          <MobileCardList>
+            {filtered.map((acc) => {
+              const st = getStatus(acc);
+              const student = studentById[acc.student_id];
+              const completed = getCompleted(acc.id);
+              const remaining = acc.total_lessons - completed;
+              const pct = acc.total_lessons > 0
+                ? Math.min(100, Math.round((completed / acc.total_lessons) * 100))
+                : 0;
+              return (
+                <MobileCard key={acc.id} faded={st === "Closed"}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-semibold text-[14px]" style={{ color: C.navy }}>
+                        {student?.zh_name || "—"}
+                        {student?.en_name && <span className="ml-1 text-[12px] font-normal" style={{ color: C.muted }}>({student.en_name})</span>}
+                      </div>
+                      <div className="text-[13px] mt-0.5" style={{ color: C.muted }}>{acc.course_label}</div>
+                    </div>
+                    <Badge tone={STATUS_TONE[st] || "gray"}>{STATUS_LABEL[st] || st}</Badge>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1">
+                    <div className="text-[12px]" style={{ color: C.muted }}>{completed}/{acc.total_lessons} 堂</div>
+                    <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: C.line }}>
+                      <div className="h-full rounded-full"
+                        style={{ width: `${pct}%`, background: st === "Completed" ? C.green : C.gold }} />
+                    </div>
+                    <div className="text-[12px] font-medium" style={{ color: remaining > 0 ? C.navy : C.muted }}>
+                      {remaining > 0 ? `剩 ${remaining} 堂` : "—"}
+                    </div>
+                  </div>
+                  <div className="flex gap-1 flex-wrap mt-1">
+                    <Btn kind="ghost" size="sm" onClick={() => toggleExpand(acc.id)}>
+                      {expandedIds.has(acc.id) ? "收起" : "展開課程"}
+                    </Btn>
+                    <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "flex", prefillStudentId: acc.student_id, prefillRuleCode: "", prefillNote: "" })}>
+                      彈性排課
+                    </Btn>
+                  </div>
+                </MobileCard>
+              );
+            })}
+          </MobileCardList>
         )}
       </Card>
 
