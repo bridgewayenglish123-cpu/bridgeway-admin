@@ -73,6 +73,16 @@ export default function UploadReportModal({
     }
   };
 
+
+  const generateOG = async (lid: string) => {
+    try {
+      await Promise.all([
+        fetch("/api/generate-og", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lessonId: lid, template: "lesson" }) }),
+        fetch("/api/generate-og", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lessonId: lid, template: "milestone" }) }),
+      ]);
+    } catch {}
+  };
+
   // Step 2: 確認詞彙後生成報告
   const handleGenerate = async () => {
     setErrorMsg(null);
@@ -87,7 +97,7 @@ export default function UploadReportModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (res.ok) { setStep("done"); onGenerated(); }
+      if (res.ok) { setStep("done"); onGenerated(); generateOG(lessonId); }
       else {
         const data = await res.json().catch(() => ({}));
         setErrorMsg(typeof data?.error === "string" ? data.error : "生成失敗");
@@ -114,7 +124,7 @@ export default function UploadReportModal({
           manualInput: { performance: manualPerformance, vocabulary: manualVocab, phrases: manualPhrases, errors: manualErrors, nextFocus: manualNextFocus, teacherNote: note },
         }),
       });
-      if (res.ok) { setStep("done"); onGenerated(); }
+      if (res.ok) { setStep("done"); onGenerated(); generateOG(lessonId); }
       else {
         const data = await res.json().catch(() => ({}));
         setErrorMsg(typeof data?.error === "string" ? data.error : "生成失敗");
