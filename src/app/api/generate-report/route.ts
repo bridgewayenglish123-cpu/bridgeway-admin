@@ -47,7 +47,7 @@ export async function POST(request: Request) {
   const resend = new Resend(process.env.RESEND_API_KEY!);
 
   try {
-    const { lessonId, vttContent, teacherNote, existingReportId, manualInput } =
+    const { lessonId, vttContent, teacherNote, existingReportId, manualInput, confirmedVocab } =
       await request.json();
 
     if (!lessonId || (!vttContent && !manualInput)) {
