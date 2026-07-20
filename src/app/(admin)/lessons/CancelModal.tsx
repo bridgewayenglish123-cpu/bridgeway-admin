@@ -38,7 +38,7 @@ export default function CancelModal({ lesson, account, teachers, onDone, onError
     startTransition(async () => {
       const res = await cancelLesson(lesson.id, null);
       if (res.error) onError(res.error);
-      else onDone("已取消,延伸課自動排到 " + autoExtDate);
+      else onDone("已取消，延伸課已自動排入（從 " + autoExtDate + " 起第一個空的時段）");
     });
   };
 
@@ -77,8 +77,9 @@ export default function CancelModal({ lesson, account, teachers, onDone, onError
               {lesson.date} {lesson.time}
             </div>
             <div className="rounded-lg p-3 text-sm" style={{ background: "#EAF0F6", color: C.navy }}>
-              取消後系統會自動在{" "}
-              <strong>{autoExtDate}</strong> 同時間建立延伸課,堂數守恆。
+              取消後系統會自動依排課規則，從{" "}
+              <strong>{autoExtDate}</strong>{" "}
+              之後找第一個空的時段建立延伸課（若該日期已有課則自動往後順延），堂數守恆。
             </div>
             <div className="text-sm font-medium" style={{ color: C.navy }}>
               要另外指定補課日期嗎？
