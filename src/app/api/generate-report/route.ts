@@ -152,16 +152,12 @@ ${transcript}
 - 英文版：全英文，語氣正式但友善，可作為學習材料
 - 禁止使用 emoji
 - 禁止空泛稱讚（如「你表現很好」），只說具體觀察
-- 單字和片語：${confirmedVocab
-  ? `老師已確認的詞彙如下，請直接使用這份清單，不要自行增減：
-    單字：${confirmedVocab.words?.join(", ") || "（無）"}
-    片語：${confirmedVocab.phrases?.join(", ") || "（無）"}`
-  : "只抓老師特別解釋過、學生問過、或課堂重點強調的詞彙，不設數量上限"}
+- 單字和片語：${confirmedVocab ? `老師已確認的詞彙清單如下，請直接使用，不要自行增減。單字：${(confirmedVocab.words || []).join(", ") || "（無）"}。片語：${(confirmedVocab.phrases || []).join(", ") || "（無）"}` : "只抓老師特別解釋過、學生問過、或課堂重點強調的詞彙，不設數量上限"}
 - 錯誤模式要列出「所有」發生的例句，不只是代表性的一句
 - errors 的 pattern 必須同時提供 pattern_zh（中文名稱）和 pattern_en（英文名稱）
 - examples 欄位是陣列，列出課堂中所有出現的錯誤例句（只能是英文），每個錯誤都要有對應的 correction
 - reflection_question 必須是語言輸出練習（造句、口說、寫作），絕對不能問課文情節
-- vocabulary 最少 6 個、最多 10 個；phrases 最少 4 個、最多 8 個
+- 如果老師已確認詞彙清單，vocabulary 和 phrases 完全依照清單，不增不減；如果沒有清單，則不設數量限制
 
 嚴格輸出以下 JSON 格式，不加任何其他文字、不加 markdown：
 
