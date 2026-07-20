@@ -163,11 +163,30 @@ export async function cancelLesson(
           ? addDays(lastLesson.date, 1)
           : addDays(lesson.date, 1);
 
+        // 預先載入這個帳戶所有已排課程的日期+時間
+        const { data: existingLessons } = await supabase
+          .from("lessons")
+          .select("date, time")
+          .eq("account_id", lesson.account_id)
+          .eq("is_active", true)
+          .eq("status", "scheduled");
+
+        const existingKeys = new Set(
+          (existingLessons || []).map(l => l.date + "__" + l.time)
+        );
+
         let cursor = searchFrom;
-        for (let i = 0; i < 60; i++) {
+        for (let i = 0; i < 90; i++) {
           const wd = new Date(cursor + "T00:00:00").getDay();
           const match = rules.find((r) => (r.weekdays as number[]).includes(wd));
-          if (match) { extDate = cursor; break; }
+          if (match) {
+            // 檢查這天同時間是否已有課
+            const key = cursor + "__" + lesson.time;
+            if (!existingKeys.has(key)) {
+              extDate = cursor;
+              break;
+            }
+          }
           cursor = addDays(cursor, 1);
         }
       }
