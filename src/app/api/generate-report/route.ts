@@ -153,8 +153,9 @@ ${transcript}
 - 禁止使用 emoji
 - 禁止空泛稱讚（如「你表現很好」），只說具體觀察
 - 單字和片語只抓「學生明顯不熟悉、或老師特別解釋過」的詞彙，最多 8 個單字、6 個片語
-- 錯誤模式要給具體例子和修正
-- errors 的 pattern 必須同時提供 pattern_zh（中文名稱）和 pattern_en（英文名稱），example 欄位只能是英文
+- 錯誤模式要列出「所有」發生的例句，不只是代表性的一句
+- errors 的 pattern 必須同時提供 pattern_zh（中文名稱）和 pattern_en（英文名稱）
+- examples 欄位是陣列，列出課堂中所有出現的錯誤例句（只能是英文），每個錯誤都要有對應的 correction
 - reflection_question 必須是語言輸出練習（造句、口說、寫作），絕對不能問課文情節
 - vocabulary 最少 6 個、最多 10 個；phrases 最少 4 個、最多 8 個
 
@@ -185,12 +186,16 @@ ${transcript}
   ],
   "errors": [
     {
-      "pattern": "past tense",
+      "pattern_zh": "過去式動詞錯誤",
+      "pattern_en": "Past tense verb error",
       "count": 3,
-      "example": "I go to school yesterday",
-      "correction": "I went to school yesterday",
-      "tip_zh": "過去式動詞要用 went，不是 go",
-      "tip_en": "Use 'went' for past tense, not 'go'"
+      "examples": [
+        { "original": "I go to school yesterday", "correction": "I went to school yesterday" },
+        { "original": "We wake up at 5:30 this morning", "correction": "We woke up at 5:30 this morning" },
+        { "original": "She come home late", "correction": "She came home late" }
+      ],
+      "tip_zh": "說過去發生的事，動詞要改成過去式",
+      "tip_en": "When talking about the past, use past tense verbs"
     }
   ],
   "comparison": {
