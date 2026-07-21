@@ -1,329 +1,210 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
 import { C } from "@/lib/constants";
+import { useRouter } from "next/navigation";
+import UploadReportModal from "../lessons/UploadReportModal";
 
-type Report = {
+type Row = {
   id: string;
-  lesson_id: string;
-  student_id: string;
-  analysis_zh: { headline: string; body: string } | null;
-  analysis_en: { headline: string; body: string } | null;
-  vocabulary: { word: string; definition_en: string; definition_zh: string }[] | null;
-  next_focus: string | null;
-  milestone: string | null;
-  created_at: string;
+  date: string;
+  time: string | null;
+  duration: number | null;
+  teacherId: string | null;
+  teacherName: string;
+  studentName: string;
+  hasReport: boolean;
+  reportedAt: string | null;
 };
 
-type Student = { id: string; zh_name: string; en_name: string | null };
-type Lesson = { id: string; date: string; time: string | null; teacher_id: string | null };
-type Teacher = { id: string; teacher_name: string };
+const PAGE_SIZE = 20;
 
-export default function ReportsClient({
-  reports, students, lessons, teachers,
-}: {
-  reports: Report[];
-  students: Student[];
-  lessons: Lesson[];
-  teachers: Teacher[];
+export function ReportsClient({ rows, teachers }: {
+  rows: Row[];
+  teachers: { id: string; name: string }[];
 }) {
-  const searchParams = useSearchParams();
+  const router = useRouter();
   const [search, setSearch] = useState("");
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
-  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
-  // mobile: "list" | "reports" | "detail"
-  const [mobileView, setMobileView] = useState<"list" | "reports" | "detail">("list");
+  const [filterTeacher, setFilterTeacher] = useState("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "uploaded" | "pending">("all");
+  const [sort, setSort] = useState<"newest" | "oldest">("newest");
+  const [page, setPage] = useState(1);
+  const [modal, setModal] = useState<Row | null>(null);
+  const [uploadedIds, setUploadedIds] = useState<Set<string>>(
+    new Set(rows.filter(r => r.hasReport).map(r => r.id))
+  );
 
-  const lessonById = useMemo(() => Object.fromEntries(lessons.map(l => [l.id, l])), [lessons]);
-  const teacherById = useMemo(() => Object.fromEntries(teachers.map(t => [t.id, t])), [teachers]);
-  const studentById = useMemo(() => Object.fromEntries(students.map(s => [s.id, s])), [students]);
+  const pendingCount = rows.filter(r => !uploadedIds.has(r.id)).length;
+  const uploadedCount = rows.length - pendingCount;
 
-  // 每位學生最新報告日期
-  const studentLastDate = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const r of reports) {
-      const date = lessonById[r.lesson_id]?.date || r.created_at.slice(0, 10);
-      if (!map[r.student_id] || date > map[r.student_id]) map[r.student_id] = date;
+  const filtered = useMemo(() => {
+    let list = [...rows];
+    if (filterStatus === "uploaded") list = list.filter(r => uploadedIds.has(r.id));
+    if (filterStatus === "pending") list = list.filter(r => !uploadedIds.has(r.id));
+    if (filterTeacher !== "all") list = list.filter(r => r.teacherId === filterTeacher);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(r =>
+        r.studentName.toLowerCase().includes(q) ||
+        r.teacherName.toLowerCase().includes(q) ||
+        r.date.includes(q)
+      );
     }
-    return map;
-  }, [reports, lessonById]);
-
-  // 有報告的學生列表，依最新上課日排序
-  const studentList = useMemo(() => {
-    const ids = [...new Set(reports.map(r => r.student_id))];
-    return ids
-      .map(id => studentById[id])
-      .filter(Boolean)
-      .filter(s => {
-        if (!search) return true;
-        const q = search.toLowerCase();
-        return s.zh_name.toLowerCase().includes(q) || s.en_name?.toLowerCase().includes(q);
-      })
-      .sort((a, b) => (studentLastDate[b.id] || "").localeCompare(studentLastDate[a.id] || ""));
-  }, [reports, studentById, search, studentLastDate]);
-
-  // 選定學生的報告列表
-  const studentReports = useMemo(() => {
-    if (!selectedStudentId) return [];
-    return reports
-      .filter(r => r.student_id === selectedStudentId)
-      .sort((a, b) => {
-        const da = lessonById[a.lesson_id]?.date || a.created_at;
-        const db = lessonById[b.lesson_id]?.date || b.created_at;
-        return db.localeCompare(da);
-      });
-  }, [reports, selectedStudentId, lessonById]);
-
-  // URL 參數直接展開
-  useEffect(() => {
-    const reportId = searchParams.get("report");
-    if (reportId) {
-      const found = reports.find(r => r.id === reportId);
-      if (found) {
-        setSelectedStudentId(found.student_id);
-        setSelectedReport(found);
-        setMobileView("detail");
-      }
-    }
-  }, [searchParams, reports]);
-
-  const selectStudent = (id: string) => {
-    setSelectedStudentId(id);
-    setSelectedReport(null);
-    setMobileView("reports");
-  };
-
-  const selectReport = (r: Report) => {
-    setSelectedReport(r);
-    setMobileView("detail");
-  };
-
-  const formatDate = (ymd: string) => {
-    const [y, m, d] = ymd.split("-");
-    return `${m}/${d}`;
-  };
-
-  // ── 報告詳情 ────────────────────────────────────────────────────────────────
-  const ReportDetail = ({ report }: { report: Report }) => {
-    const lesson = lessonById[report.lesson_id];
-    const teacher = lesson?.teacher_id ? teacherById[lesson.teacher_id] : null;
-    const student = studentById[report.student_id];
-    return (
-      <div className="space-y-4 p-4 md:p-6">
-        {/* Header */}
-        <div className="pb-3" style={{ borderBottom: `1px solid ${C.line}` }}>
-          <div className="text-xs mb-1" style={{ color: C.muted }}>
-            {lesson?.date} · {teacher?.teacher_name || "—"} · {lesson?.time || ""}
-          </div>
-          <div className="text-xl font-semibold leading-snug"
-            style={{ color: C.navy, fontFamily: "Cormorant Garamond, serif" }}>
-            {report.analysis_zh?.headline}
-          </div>
-        </div>
-
-        {/* 里程碑 */}
-        {report.milestone && (
-          <div className="rounded-xl px-4 py-3 text-sm font-medium"
-            style={{ background: "#FFF8E1", color: "#F57F17", border: "1px solid #FFE082" }}>
-            🎉 {report.milestone}
-          </div>
-        )}
-
-        {/* 中文總結 */}
-        {report.analysis_zh && (
-          <div className="rounded-xl p-4 space-y-1" style={{ background: "#F8F6F0" }}>
-            <div className="text-xs font-semibold mb-2" style={{ color: C.muted }}>課堂總結</div>
-            <p className="text-sm leading-relaxed" style={{ color: C.text }}>{report.analysis_zh.body}</p>
-          </div>
-        )}
-
-        {/* 英文總結 */}
-        {report.analysis_en && (
-          <div className="rounded-xl p-4" style={{ background: "#EAF0F6" }}>
-            <div className="text-xs font-semibold mb-2" style={{ color: C.muted }}>English Summary</div>
-            <p className="text-sm leading-relaxed italic" style={{ color: C.text }}>{report.analysis_en.body}</p>
-          </div>
-        )}
-
-        {/* 詞彙 */}
-        {report.vocabulary && report.vocabulary.length > 0 && (
-          <div>
-            <div className="text-xs font-semibold mb-2" style={{ color: C.muted }}>本堂詞彙 ({report.vocabulary.length})</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {report.vocabulary.map((v, i) => (
-                <div key={i} className="rounded-lg px-3 py-2" style={{ background: "#F8F6F0" }}>
-                  <div className="font-semibold text-sm" style={{ color: C.navy }}>{v.word}</div>
-                  <div className="text-xs mt-0.5" style={{ color: C.muted }}>{v.definition_zh}</div>
-                  <div className="text-xs" style={{ color: C.text, opacity: 0.7 }}>{v.definition_en}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 下堂課建議 */}
-        {report.next_focus && (
-          <div className="rounded-xl p-4" style={{ background: "#FBF8EF", border: `1px solid rgba(194,153,47,0.3)` }}>
-            <div className="text-xs font-semibold mb-2" style={{ color: C.gold }}>📌 下堂課建議</div>
-            <p className="text-sm leading-relaxed" style={{ color: C.text }}>{report.next_focus}</p>
-          </div>
-        )}
-      </div>
+    list.sort((a, b) => sort === "newest"
+      ? b.date.localeCompare(a.date) || (b.time ?? "").localeCompare(a.time ?? "")
+      : a.date.localeCompare(b.date) || (a.time ?? "").localeCompare(b.time ?? "")
     );
-  };
+    return list;
+  }, [rows, search, filterTeacher, filterStatus, sort, uploadedIds]);
 
-  // ── 學生列表欄 ───────────────────────────────────────────────────────────────
-  const StudentList = () => (
-    <div className="h-full flex flex-col">
-      <div className="p-4 pb-2">
-        <input
-          type="text"
-          placeholder="搜尋學生..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full rounded-lg border px-3 py-2 text-sm"
-          style={{ borderColor: C.line, color: C.text }}
-        />
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        {studentList.length === 0 && (
-          <div className="p-6 text-center text-sm" style={{ color: C.muted }}>沒有報告</div>
-        )}
-        {studentList.map(s => {
-          const count = reports.filter(r => r.student_id === s.id).length;
-          const lastDate = studentLastDate[s.id];
-          const isActive = selectedStudentId === s.id;
-          return (
-            <button
-              key={s.id}
-              onClick={() => selectStudent(s.id)}
-              className="w-full text-left px-4 py-3 flex items-center justify-between transition-colors"
-              style={{
-                background: isActive ? "#EAF0F6" : "transparent",
-                borderLeft: isActive ? `3px solid ${C.navy}` : "3px solid transparent",
-              }}
-            >
-              <div>
-                <div className="font-medium text-sm" style={{ color: C.navy }}>{s.zh_name}</div>
-                {s.en_name && <div className="text-xs" style={{ color: C.muted }}>{s.en_name}</div>}
-              </div>
-              <div className="text-right">
-                <div className="text-xs" style={{ color: C.muted }}>{lastDate ? formatDate(lastDate) : "—"}</div>
-                <div className="text-xs mt-0.5" style={{ color: C.muted }}>{count} 份</div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
+  useEffect(() => { setPage(1); }, [search, filterTeacher, filterStatus, sort]);
 
-  // ── 報告列表欄 ───────────────────────────────────────────────────────────────
-  const ReportList = () => (
-    <div className="h-full flex flex-col">
-      <div className="p-4 pb-2 flex items-center gap-2">
-        <button
-          className="md:hidden text-sm"
-          style={{ color: C.navy }}
-          onClick={() => setMobileView("list")}
-        >← 返回</button>
-        <div className="font-semibold text-sm" style={{ color: C.navy }}>
-          {selectedStudentId ? studentById[selectedStudentId]?.zh_name : ""} 的報告
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        {studentReports.map(r => {
-          const lesson = lessonById[r.lesson_id];
-          const teacher = lesson?.teacher_id ? teacherById[lesson.teacher_id] : null;
-          const isActive = selectedReport?.id === r.id;
-          return (
-            <button
-              key={r.id}
-              onClick={() => selectReport(r)}
-              className="w-full text-left px-4 py-3 transition-colors"
-              style={{
-                background: isActive ? "#EAF0F6" : "transparent",
-                borderLeft: isActive ? `3px solid ${C.gold}` : "3px solid transparent",
-                borderBottom: `1px solid ${C.line}`,
-              }}
-            >
-              <div className="flex justify-between items-start">
-                <div className="text-sm font-medium" style={{ color: C.navy }}>
-                  {lesson?.date || r.created_at.slice(0, 10)}
-                </div>
-                <div className="text-xs" style={{ color: C.muted }}>{teacher?.teacher_name || "—"}</div>
-              </div>
-              <div className="text-xs mt-1 line-clamp-2" style={{ color: C.text }}>
-                {r.analysis_zh?.headline || "—"}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
-    <div className="flex flex-col h-screen max-h-screen overflow-hidden">
+    <div className="mx-auto max-w-[1000px] px-4 py-6 sm:px-8 sm:py-8">
       {/* Header */}
-      <div className="px-6 py-4 flex-shrink-0" style={{ borderBottom: `1px solid ${C.line}` }}>
-        <div className="flex items-center gap-3">
-          {mobileView === "detail" && (
-            <button className="md:hidden text-sm" style={{ color: C.navy }}
-              onClick={() => setMobileView("reports")}>←</button>
-          )}
-          <h1 className="text-xl font-semibold" style={{ color: C.navy, fontFamily: "Cormorant Garamond, serif" }}>
-            報告管理
-          </h1>
-          <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "#EAF0F6", color: C.muted }}>
-            {reports.length} 份
-          </span>
+      <div className="flex items-baseline justify-between mb-5">
+        <h1 className="font-serif text-[26px] font-medium" style={{ color: C.navy }}>
+          報告管理
+        </h1>
+        <div className="text-[13px]" style={{ color: C.muted }}>
+          {pendingCount > 0 && <span className="mr-2 font-medium" style={{ color: C.red }}>{pendingCount} 待上傳</span>}
+          共 {rows.length} 堂
         </div>
       </div>
 
-      {/* 三欄佈局 (desktop) / 三層導航 (mobile) */}
-      <div className="flex flex-1 overflow-hidden">
+      {/* 統計卡 */}
+      <div className="grid grid-cols-3 gap-3 mb-5">
+        {[
+          { label: "全部完課", value: rows.length, color: C.navy },
+          { label: "待上傳", value: pendingCount, color: C.red },
+          { label: "已上傳", value: uploadedCount, color: C.green },
+        ].map(s => (
+          <div key={s.label} className="rounded-xl bg-white p-3 text-center shadow-sm">
+            <div className="font-serif text-[28px] font-medium" style={{ color: s.color }}>{s.value}</div>
+            <div className="text-[11px] mt-0.5" style={{ color: C.muted }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
 
-        {/* 欄 1：學生列表 */}
-        <div
-          className={`${mobileView === "list" ? "flex" : "hidden"} md:flex flex-col`}
-          style={{ width: "100%", maxWidth: "220px", borderRight: `1px solid ${C.line}`, minWidth: 0 }}
-        >
-          <StudentList />
+      {/* 搜尋 */}
+      <input type="text" placeholder="搜尋學生或老師姓名..."
+        value={search} onChange={e => setSearch(e.target.value)}
+        className="w-full rounded-xl border px-4 py-2.5 text-sm outline-none mb-3"
+        style={{ borderColor: C.line, color: C.navy }} />
+
+      {/* 篩選 */}
+      <div className="flex gap-2 flex-wrap mb-4">
+        {/* 狀態 */}
+        <div className="flex gap-1 rounded-xl p-1" style={{ background: "#EAF0F6" }}>
+          {(["all", "pending", "uploaded"] as const).map(v => (
+            <button key={v} onClick={() => setFilterStatus(v)}
+              className="rounded-lg px-3 py-1.5 text-[12px] font-medium transition"
+              style={{ background: filterStatus === v ? C.navy : "transparent", color: filterStatus === v ? "#fff" : C.muted }}>
+              {v === "all" ? "全部" : v === "pending" ? "待上傳" : "已上傳"}
+            </button>
+          ))}
         </div>
 
-        {/* 欄 2：報告列表 */}
-        <div
-          className={`${mobileView === "reports" ? "flex" : "hidden"} md:flex flex-col`}
-          style={{ width: "100%", maxWidth: "280px", borderRight: `1px solid ${C.line}`, minWidth: 0 }}
-        >
-          {selectedStudentId ? (
-            <ReportList />
-          ) : (
-            <div className="p-6 text-sm hidden md:block" style={{ color: C.muted }}>
-              ← 選擇學生查看報告
-            </div>
-          )}
-        </div>
+        {/* 老師 */}
+        <select value={filterTeacher} onChange={e => setFilterTeacher(e.target.value)}
+          className="rounded-xl border px-3 py-1.5 text-[12px] outline-none"
+          style={{ borderColor: C.line, color: C.navy }}>
+          <option value="all">所有老師</option>
+          {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
 
-        {/* 欄 3：報告內容 */}
-        <div
-          className={`${mobileView === "detail" ? "flex" : "hidden"} md:flex flex-col flex-1 overflow-y-auto`}
-          style={{ minWidth: 0 }}
-        >
-          {mobileView === "detail" && selectedReport === null && (
-            <button className="md:hidden p-4 text-sm text-left" style={{ color: C.navy }}
-              onClick={() => setMobileView("reports")}>← 返回報告列表</button>
-          )}
-          {selectedReport ? (
-            <ReportDetail report={selectedReport} />
-          ) : (
-            <div className="p-6 text-sm hidden md:block" style={{ color: C.muted }}>
-              ← 選擇報告查看內容
-            </div>
-          )}
+        {/* 排序 */}
+        <div className="flex gap-1 rounded-xl p-1" style={{ background: "#EAF0F6" }}>
+          {(["newest", "oldest"] as const).map(v => (
+            <button key={v} onClick={() => setSort(v)}
+              className="rounded-lg px-3 py-1.5 text-[12px] font-medium transition"
+              style={{ background: sort === v ? C.navy : "transparent", color: sort === v ? "#fff" : C.muted }}>
+              {v === "newest" ? "最新" : "最舊"}
+            </button>
+          ))}
         </div>
       </div>
+
+      {/* 結果數 */}
+      {(search || filterTeacher !== "all" || filterStatus !== "all") && (
+        <div className="text-[12px] mb-3" style={{ color: C.muted }}>找到 {filtered.length} 筆</div>
+      )}
+
+      {/* 列表 */}
+      <div className="flex flex-col gap-2 mb-6">
+        {paginated.map(r => {
+          const uploaded = uploadedIds.has(r.id);
+          return (
+            <div key={r.id} className="rounded-xl bg-white p-4 shadow-sm flex items-center gap-3"
+              style={{ borderLeft: `3px solid ${uploaded ? C.green : C.amber}` }}>
+              <div className="flex-shrink-0 text-center w-10">
+                <div className="text-[10px]" style={{ color: C.muted }}>{r.date.slice(5, 7)}月</div>
+                <div className="font-serif text-[20px] font-medium" style={{ color: C.navy }}>{r.date.slice(8)}</div>
+              </div>
+              <div className="w-px self-stretch" style={{ background: C.line }} />
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-[14px]" style={{ color: C.navy }}>{r.studentName}</div>
+                <div className="text-[12px] mt-0.5" style={{ color: C.muted }}>
+                  {r.teacherName}
+                  {r.time && <span> · {r.time.slice(0, 5)}</span>}
+                  {r.duration && <span> · {r.duration} 分鐘</span>}
+                </div>
+              </div>
+              <div className="flex-shrink-0 flex items-center gap-2">
+                {uploaded ? (
+                  <span className="text-[11px] px-2.5 py-1.5 rounded-full font-medium"
+                    style={{ background: "#E8F5E9", color: "#2E7D32" }}>✓ 已上傳</span>
+                ) : (
+                  <button onClick={() => setModal(r)}
+                    className="text-[11px] px-2.5 py-1.5 rounded-full font-medium transition"
+                    style={{ background: C.gold, color: "#fff" }}>
+                    上傳報告
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        {paginated.length === 0 && (
+          <div className="rounded-xl border border-dashed py-12 text-center" style={{ borderColor: C.line }}>
+            <p className="text-sm" style={{ color: C.muted }}>找不到符合的課程</p>
+          </div>
+        )}
+      </div>
+
+      {/* 分頁 */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+            className="px-4 py-2 rounded-xl text-[13px] font-medium disabled:opacity-40"
+            style={{ background: "#fff", color: C.navy, border: `1px solid ${C.line}` }}>
+            ← 上一頁
+          </button>
+          <div className="text-[12px]" style={{ color: C.muted }}>第 {page} 頁，共 {totalPages} 頁</div>
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+            className="px-4 py-2 rounded-xl text-[13px] font-medium disabled:opacity-40"
+            style={{ background: "#fff", color: C.navy, border: `1px solid ${C.line}` }}>
+            下一頁 →
+          </button>
+        </div>
+      )}
+
+      {modal && (
+        <UploadReportModal
+          lessonId={modal.id}
+          studentName={modal.studentName}
+          lessonDate={modal.date}
+          teacherName={modal.teacherName}
+          onGenerated={() => {
+            setUploadedIds(prev => { const n = new Set(Array.from(prev)); n.add(modal!.id); return n; });
+            setModal(null);
+            router.refresh();
+          }}
+          onClose={() => setModal(null)}
+        />
+      )}
     </div>
   );
 }

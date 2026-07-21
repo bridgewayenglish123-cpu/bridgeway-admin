@@ -125,6 +125,21 @@ export default async function DashboardPage() {
       teacherName: teacherById[l.teacher_id || ""]?.teacher_name || "—",
     }));
 
+  // 本週老師上傳狀況
+  const wkStart = wk.start;
+  const wkEnd = wk.end;
+  const teacherStats = teachers
+    .filter((t) => t.active_status === "Active")
+    .map((t) => {
+      const wkLessons = lessons.filter(
+        (l) => l.is_active && l.status === "completed" &&
+          l.teacher_id === t.id && l.date >= wkStart && l.date <= wkEnd
+      );
+      const uploaded = wkLessons.filter((l) => reportedLessonIds.has(l.id)).length;
+      return { teacherName: t.teacher_name, uploaded, total: wkLessons.length };
+    })
+    .filter((s) => s.total > 0);
+
   const todayFull = lessons
     .filter((l) => l.is_active && l.date === today)
     .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
@@ -197,7 +212,7 @@ export default async function DashboardPage() {
       )}
 
       {/* 尚未上傳報告的課堂 */}
-      {pendingReports.length > 0 && <PendingReports pending={pendingReports} />}
+      {pendingReports.length > 0 && <PendingReports pending={pendingReports} teacherStats={teacherStats} />}
 
       {/* 資料健康檢查 */}
       <HealthCheck
