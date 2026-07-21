@@ -124,7 +124,7 @@ const STATUS_LABEL: Record<StudentStatus, string> = {
 
 const EMPTY_FORM = {
   zh_name: "", en_name: "", zoom_email: "",
-  contact_info: "", age: "", current_teacher_id: "", level: "Elementary",
+  contact_info: "", age: "", current_teacher_id: "", level: "Elementary", learner_type: "Adult",
 };
 
 // ── CSV utility ───────────────────────────────────────────────────────────────
@@ -233,6 +233,17 @@ function StudentForm({
           <option value="Elementary">Elementary（有點基礎）</option>
           <option value="Intermediate">Intermediate（中級）</option>
           <option value="Upper-Intermediate">Upper-Intermediate（中高級）</option>
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>學生類型</label>
+        <select className="w-full rounded-lg border px-3 py-2 text-sm"
+          style={{ borderColor: C.line, color: C.text }}
+          value={form.learner_type}
+          onChange={(e) => set("learner_type", e.target.value)}>
+          <option value="Young Learner">Young Learner（兒童）</option>
+          <option value="Junior">Junior（青少年）</option>
+          <option value="Adult">Adult（成人）</option>
         </select>
       </div>
       <div className="flex justify-end gap-2 pt-1">
@@ -758,6 +769,7 @@ export default function StudentsClient({ students, teachers, accounts, lessons, 
                 age: modal.student.age || "",
                 current_teacher_id: modal.student.current_teacher_id || "",
                 level: (modal.student as any).level || "Elementary",
+                learner_type: (modal.student as any).learner_type || "Adult",
               } : EMPTY_FORM}
               teachers={teachers}
               onSave={handleSave}
