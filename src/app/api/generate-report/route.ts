@@ -158,6 +158,8 @@ ${transcript}
 - examples 欄位是陣列，列出課堂中所有出現的錯誤例句（只能是英文），每個錯誤都要有對應的 correction
 - reflection_question 必須是語言輸出練習（造句、口說、寫作），絕對不能問課文情節
 - 如果老師已確認詞彙清單，vocabulary 和 phrases 完全依照清單，不增不減；如果沒有清單，則不設數量限制
+- 每個 vocabulary 和 phrase 都必須有 example_en（英文例句）和 example_zh（中文翻譯），例句要自然生活化，不要太教科書
+- hidden_gem：從逐字稿找一個學生可能沒注意到但真正值得被看見的時刻，用溫暖故事感的中文寫（2-3句）。若沒有真正特別的時刻，請回傳 null，絕對不要硬編
 
 嚴格輸出以下 JSON 格式，不加任何其他文字、不加 markdown：
 
@@ -167,7 +169,9 @@ ${transcript}
       "word": "actually",
       "type": "word",
       "definition_zh": "實際上、事實上",
-      "definition_en": "used to emphasize what is really true"
+      "definition_en": "used to emphasize what is really true",
+      "example_en": "I thought it would be boring, but it was actually really fun.",
+      "example_zh": "我以為會很無聊，但其實真的很有趣。"
     }
   ],
   "phrases": [
@@ -175,7 +179,9 @@ ${transcript}
       "phrase": "I think it depends on…",
       "type": "phrase",
       "usage_zh": "表達不確定或視情況而定時使用",
-      "usage_en": "used when the answer varies by situation"
+      "usage_en": "used when the answer varies by situation",
+      "example_en": "I think it depends on how much time you have.",
+      "example_zh": "我覺得要看你有多少時間而定。"
     }
   ],
   "strengths": [
@@ -202,6 +208,7 @@ ${transcript}
     "summary_zh": "這堂課你的文法錯誤比上堂課減少了 2 次，主動提問增加了 2 次。",
     "summary_en": "You made 2 fewer grammar errors and asked 2 more questions than last lesson."
   },
+  "hidden_gem": "A specific moment from today's lesson that the student might not have noticed — something genuinely impressive or meaningful. Write in warm, story-like Chinese (2-3 sentences). IMPORTANT: Only include this if there is a truly remarkable moment worth highlighting. If nothing stands out, return null.",
   "analysis_zh": {
     "headline": "Annie，你這堂課真的有進步。",
     "body": "具體、有溫度的中文分析，2-4句。"
