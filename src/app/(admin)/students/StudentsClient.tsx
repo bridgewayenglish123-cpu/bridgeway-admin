@@ -231,6 +231,7 @@ function StudentForm({
           onChange={(e) => set("level", e.target.value)}>
           <option value="Beginner">Beginner（剛開始學）</option>
           <option value="Elementary">Elementary（有點基礎）</option>
+          <option value="Pre-Intermediate">Pre-Intermediate（初級）</option>
           <option value="Intermediate">Intermediate（中級）</option>
           <option value="Upper-Intermediate">Upper-Intermediate（中高級）</option>
         </select>
