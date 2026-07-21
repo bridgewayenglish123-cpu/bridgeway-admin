@@ -124,7 +124,7 @@ const STATUS_LABEL: Record<StudentStatus, string> = {
 
 const EMPTY_FORM = {
   zh_name: "", en_name: "", zoom_email: "",
-  contact_info: "", age: "", current_teacher_id: "",
+  contact_info: "", age: "", current_teacher_id: "", level: "Elementary",
 };
 
 // ── CSV utility ───────────────────────────────────────────────────────────────
@@ -221,6 +221,18 @@ function StudentForm({
           {[...activeTeachers].sort((a,b) => a.teacher_name.localeCompare(b.teacher_name)).map((t) => (
             <option key={t.id} value={t.id}>{t.teacher_name}</option>
           ))}
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>英文程度</label>
+        <select className="w-full rounded-lg border px-3 py-2 text-sm"
+          style={{ borderColor: C.line, color: C.text }}
+          value={form.level}
+          onChange={(e) => set("level", e.target.value)}>
+          <option value="Beginner">Beginner（剛開始學）</option>
+          <option value="Elementary">Elementary（有點基礎）</option>
+          <option value="Intermediate">Intermediate（中級）</option>
+          <option value="Upper-Intermediate">Upper-Intermediate（中高級）</option>
         </select>
       </div>
       <div className="flex justify-end gap-2 pt-1">
@@ -745,6 +757,7 @@ export default function StudentsClient({ students, teachers, accounts, lessons, 
                 contact_info: modal.student.contact_info || "",
                 age: modal.student.age || "",
                 current_teacher_id: modal.student.current_teacher_id || "",
+                level: (modal.student as any).level || "Elementary",
               } : EMPTY_FORM}
               teachers={teachers}
               onSave={handleSave}

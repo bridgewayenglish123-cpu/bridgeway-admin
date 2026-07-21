@@ -44,6 +44,7 @@ export async function updateStudent(
     contact_info: string;
     age: string;
     current_teacher_id: string;
+    level?: string;
   }
 ) {
   const supabase = createClient();
@@ -56,6 +57,7 @@ export async function updateStudent(
       contact_info: data.contact_info.trim() || null,
       age: data.age.trim() || null,
       current_teacher_id: data.current_teacher_id || null,
+      level: data.level || 'Elementary',
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);
