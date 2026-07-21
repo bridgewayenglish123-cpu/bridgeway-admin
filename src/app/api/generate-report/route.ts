@@ -76,7 +76,7 @@ export async function POST(request: Request) {
     // 查詢學生資訊
     const { data: student } = await admin
       .from("students")
-      .select("id, en_name, zh_name, zoom_email, learning_goal")
+      .select("id, en_name, zh_name, zoom_email, learning_goal, level")
       .eq("id", lesson.student_id)
       .single();
 
@@ -108,6 +108,7 @@ export async function POST(request: Request) {
       .eq("student_id", student.id);
 
     const studentName = student.en_name ?? student.zh_name;
+    const studentLevel = (student as any).level ?? 'Elementary';
     // untyped admin client 對 embed 會解析為 never，存取時轉 any
     const teacherRel = lesson.teacher as any;
     const teacherName =
