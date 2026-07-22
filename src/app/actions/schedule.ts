@@ -245,14 +245,13 @@ export async function generateLessonsForAccount(accountId: string): Promise<{
     .eq("account_id", accountId);
 
   const activeLessons = (existingLessons || []).filter((l) => l.is_active);
-  // 已佔用堂數 = completed 或 scheduled，且非補課
-  // cancelled 不算(已退回堂數)；makeup 不算(原課已佔額度)
-  // 用排除法而非白名單：新增 class_type 時不會靜默漏算
-  const NON_BILLABLE_TYPES = ["makeup"];
+  // 已佔用堂數 = completed 或 scheduled 的所有課
+  // 業務規則：一堂課 = 一堂額度。cancelled 後必定由 makeup(指定日期)
+  // 或 extension(自動延期) 取代，取代的那堂才算額度，cancelled 本身不算。
+  // 不做 class_type 白名單/黑名單：所有 general / makeup / extension 一律計入，
+  // 避免新增類型時靜默漏算(曾因舊資料 class_type='regular' 未被計入而超額生成)。
   const usedCount = activeLessons.filter(
-    (l) =>
-      (l.status === "completed" || l.status === "scheduled") &&
-      NON_BILLABLE_TYPES.includes(l.class_type ?? "") === false
+    (l) => l.status === "completed" || l.status === "scheduled"
   ).length;
   const remaining = account.total_lessons - usedCount;
   if (remaining <= 0) return { ok: true, added: 0 };
