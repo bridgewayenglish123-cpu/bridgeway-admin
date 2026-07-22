@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { C } from "@/lib/constants";
 import { todayYMD, addDays } from "@/lib/utils";
 import type { Lesson, Teacher } from "@/lib/supabase/types";
 
 type PartialAccount = { teacher_type: string };
 import Btn from "@/components/ui/Btn";
-import { cancelLesson } from "@/app/actions/lessons";
+import { cancelLesson, previewExtensionSlot } from "@/app/actions/lessons";
 
 interface Props {
   lesson: Lesson;
@@ -27,7 +27,19 @@ export default function CancelModal({ lesson, account, teachers, onDone, onError
   const [isPending, startTransition] = useTransition();
   const [conflictError, setConflictError] = useState<string | null>(null);
 
-  const autoExtDate = addDays(lesson.date, 7);
+  // 延伸課實際排到哪一天由 server 依排課規則計算(跨帳戶檢查空位),
+  // 不能在前端用 +7 天猜測 — 規則可能一週多堂,且中間可能有空位可填。
+  const [preview, setPreview] = useState<{
+    date?: string; time?: string; weekdayLabel?: string; reason?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    previewExtensionSlot(lesson.id).then((r) => {
+      if (alive) setPreview(r);
+    });
+    return () => { alive = false; };
+  }, [lesson.id]);
 
   // 過濾老師:依帳戶類型
   const filteredTeachers = [...teachers]
@@ -38,7 +50,11 @@ export default function CancelModal({ lesson, account, teachers, onDone, onError
     startTransition(async () => {
       const res = await cancelLesson(lesson.id, null);
       if (res.error) onError(res.error);
-      else onDone("已取消，延伸課已自動排入（從 " + autoExtDate + " 起第一個空的時段）");
+      else onDone(
+        preview?.date
+          ? "已取消，延伸課已排至 " + preview.date + " " + (preview.time || "")
+          : "已取消"
+      );
     });
   };
 
@@ -77,9 +93,19 @@ export default function CancelModal({ lesson, account, teachers, onDone, onError
               {lesson.date} {lesson.time}
             </div>
             <div className="rounded-lg p-3 text-sm" style={{ background: "#EAF0F6", color: C.navy }}>
-              取消後系統會自動依排課規則，從{" "}
-              <strong>{autoExtDate}</strong>{" "}
-              之後找第一個空的時段建立延伸課（若該日期已有課則自動往後順延），堂數守恆。
+              {preview === null ? (
+                <span style={{ color: C.muted }}>計算延伸課日期中…</span>
+              ) : preview.date ? (
+                <>
+                  取消後將自動建立延伸課，排至{" "}
+                  <strong>
+                    {preview.date}（{preview.weekdayLabel}）{preview.time}
+                  </strong>
+                  ，堂數守恆。
+                </>
+              ) : (
+                <>不會產生延伸課：{preview.reason}</>
+              )}
             </div>
             <div className="text-sm font-medium" style={{ color: C.navy }}>
               要另外指定補課日期嗎？

@@ -108,6 +108,53 @@ export async function revertLessonToScheduled(lessonId: string) {
   return { ok: true };
 }
 
+/**
+ * 預覽:若取消這堂課,延伸課會排到哪一天。
+ * 供 CancelModal 在使用者按下確認前顯示,避免「按了才知道排到哪」。
+ * 回傳 null 表示不會產生延伸課(非 general、無排課規則、或 90 天內找不到空位)。
+ */
+export async function previewExtensionSlot(lessonId: string): Promise<{
+  date?: string;
+  time?: string;
+  weekdayLabel?: string;
+  reason?: string;
+}> {
+  const supabase = createClient();
+
+  const { data: lesson } = await supabase
+    .from("lessons")
+    .select("account_id, student_id, date, class_type")
+    .eq("id", lessonId)
+    .single();
+  if (!lesson) return { reason: "找不到課程" };
+
+  if (lesson.class_type !== "general") {
+    return { reason: "補課/延伸課取消後不再產生延伸" };
+  }
+
+  const { data: rules } = await supabase
+    .from("schedule_rules")
+    .select("weekdays, time")
+    .eq("account_id", lesson.account_id)
+    .eq("active_status", "Active");
+
+  if (!rules || rules.length === 0) {
+    return { reason: "此帳戶無生效排課規則(彈性預約),不會自動延伸" };
+  }
+
+  const slot = await findNextAvailableSlot(
+    supabase,
+    lesson.student_id,
+    rules as any,
+    lesson.date
+  );
+  if (!slot) return { reason: "90 天內找不到可用時段" };
+
+  const WD = ["日", "一", "二", "三", "四", "五", "六"];
+  const wd = new Date(slot.date + "T00:00:00").getDay();
+  return { date: slot.date, time: slot.time, weekdayLabel: "週" + WD[wd] };
+}
+
 // ── 取消課程 ──────────────────────────────────────────────────────────────────
 // makeup = null  →  只取消 + 建自動延伸(+7天 extension)
 // makeup = {date, time}  →  取消 + 建 makeup,讓延伸 inactive
