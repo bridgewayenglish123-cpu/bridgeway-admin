@@ -153,15 +153,24 @@ ${wdLabels} ${rule.time}
   const handleGenerate = (rule: ScheduleRule) => {
     const acc = accountById[rule.account_id];
     const student = acc ? studentById[acc.student_id] : null;
-    const existing = lessons.filter((l) => l.account_id === rule.account_id && l.is_active && l.class_type === "general").length;
+    // 與 server 端 usedCount 同一套算法:completed + scheduled 全類型計入,
+    // cancelled 不算(已由 makeup/extension 取代)
+    const existing = lessons.filter(
+      (l) =>
+        l.account_id === rule.account_id &&
+        l.is_active &&
+        (l.status === "completed" || l.status === "scheduled")
+    ).length;
     const total = acc?.total_lessons || 0;
+    const willAdd = Math.max(0, total - existing);
     askConfirm({
       title: "生成課程",
       message: `即將為「${student?.zh_name || "?"} - ${acc?.course_label || "?"}」生成課程。
 
 生成邏輯:考慮該帳戶所有生效規則,穿插排列日期,直到達成 ${total} 堂為止。
 
-目前已存在 ${existing} 堂 active 一般課,將補到 ${total} 堂。`,
+已佔用 ${existing} / ${total} 堂(已完成 + 待上課,不含已取消)。
+${willAdd > 0 ? `本次將生成 ${willAdd} 堂。` : "堂數已滿,不會生成新課。"}`,
       confirmLabel: "確認生成",
       onConfirm: async () => {
         const res = await generateLessonsForAccount(rule.account_id);
