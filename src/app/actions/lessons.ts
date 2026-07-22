@@ -157,7 +157,14 @@ export async function previewExtensionSlot(lessonId: string): Promise<{
     rules as any,
     lesson.date
   );
-  if (!slot) return { reason: "90 天內找不到可用時段" };
+  if (!slot) {
+    return {
+      reason:
+        "90 天內找不到可用時段 [debug: rules=" +
+        JSON.stringify(rules) +
+        " from=" + lesson.date + "]",
+    };
+  }
 
   const WD = ["日", "一", "二", "三", "四", "五", "六"];
   const wd = new Date(slot.date + "T00:00:00").getDay();
