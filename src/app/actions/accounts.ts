@@ -21,6 +21,7 @@ function isTimeOverlap(
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { addDays } from "@/lib/utils";
 import type { TeacherType, BillingType } from "@/lib/supabase/types";
 
 function uid(prefix = "ac") {
@@ -108,6 +109,36 @@ export async function openAccount(input: OpenAccountInput) {
 
       if (oldRules && oldRules.length > 0) {
         const now2 = new Date().toISOString();
+
+        // 續購自動接續:新帳戶從「該學生最後一堂已排課程」之後的
+        // 下一個符合規則的日期開始,不與舊帳戶的課重疊。
+        const { data: lastLesson } = await supabase
+          .from("lessons")
+          .select("date")
+          .eq("student_id", input.student_id)
+          .eq("is_active", true)
+          .in("status", ["scheduled", "completed"])
+          .order("date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        let nextStart: string | null = null;
+        if (lastLesson?.date) {
+          const allWeekdays = new Set<number>();
+          for (const r of oldRules as any[]) {
+            for (const wd of (r.weekdays as number[]) || []) allWeekdays.add(wd);
+          }
+          let cursor = addDays(lastLesson.date, 1);
+          for (let i = 0; i < 90; i++) {
+            const wd = new Date(cursor + "T00:00:00").getDay();
+            if (allWeekdays.has(wd)) {
+              nextStart = cursor;
+              break;
+            }
+            cursor = addDays(cursor, 1);
+          }
+        }
+
         const newRules = oldRules.map((r: any) => ({
           id: uid("sr"),
           account_id: accountId,
@@ -126,6 +157,14 @@ export async function openAccount(input: OpenAccountInput) {
           .from("schedule_rules")
           .update({ active_status: "Inactive", updated_at: now2 })
           .eq("account_id", prevAccId);
+
+        // 起始日寫入新帳戶(生成課程的唯一權威來源)
+        if (nextStart) {
+          await supabase
+            .from("accounts")
+            .update({ start_lesson_date: nextStart, updated_at: now2 })
+            .eq("id", accountId);
+        }
       }
     }
   } catch (_) {}

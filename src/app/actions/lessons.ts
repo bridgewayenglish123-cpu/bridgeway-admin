@@ -148,26 +148,29 @@ export async function cancelLesson(
       let extDate: string | null = null;
 
       if (rules && rules.length > 0) {
-        // 找最後一堂已排課程後的下一個符合週幾的日期
+        // 起點:該「學生」所有帳戶中最後一堂已排課程之後。
+        // 學生視角是一條連續的時間線(第一次購課 8 堂 + 第二次購課 8 堂 = 16 堂),
+        // 帳戶只是財務上的分批。延伸課排到整條線最後面,
+        // 才不會與其他帳戶已排的課相撞。
         const { data: lastLesson } = await supabase
           .from("lessons")
           .select("date")
-          .eq("account_id", lesson.account_id)
+          .eq("student_id", lesson.student_id)
           .eq("is_active", true)
           .eq("status", "scheduled")
           .order("date", { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         const searchFrom = lastLesson?.date
           ? addDays(lastLesson.date, 1)
           : addDays(lesson.date, 1);
 
-        // 預先載入這個帳戶所有已排課程的日期+時間
+        // 預先載入這個「學生」所有已排課程的日期+時間(跨帳戶)
         const { data: existingLessons } = await supabase
           .from("lessons")
           .select("date, time")
-          .eq("account_id", lesson.account_id)
+          .eq("student_id", lesson.student_id)
           .eq("is_active", true)
           .eq("status", "scheduled");
 
