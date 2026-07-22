@@ -18,6 +18,7 @@ export async function createScheduleRule(data: {
   duration: number;
   start_date: string | null;
   end_date: string | null;
+  account_start_date?: string | null;
 }) {
   const supabase = createClient();
 
@@ -81,7 +82,17 @@ export async function createScheduleRule(data: {
     updated_at: now,
   });
   if (error) return { error: error.message };
+
+  // 起始日寫入帳戶層級（同一帳戶所有時段共用）
+  if (data.account_start_date !== undefined) {
+    await supabase
+      .from("accounts")
+      .update({ start_lesson_date: data.account_start_date, updated_at: now })
+      .eq("id", data.account_id);
+  }
+
   revalidatePath("/schedule");
+  revalidatePath("/accounts");
   return { ok: true };
 }
 
@@ -94,6 +105,7 @@ export async function updateScheduleRule(id: string, data: {
   duration: number;
   start_date: string | null;
   end_date: string | null;
+  account_start_date?: string | null;
 }) {
   const supabase = createClient();
 
@@ -154,7 +166,20 @@ export async function updateScheduleRule(id: string, data: {
     })
     .eq("id", id);
   if (error) return { error: error.message };
+
+  // 起始日寫入帳戶層級（同一帳戶所有時段共用）
+  if (data.account_start_date !== undefined) {
+    await supabase
+      .from("accounts")
+      .update({
+        start_lesson_date: data.account_start_date,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", data.account_id);
+  }
+
   revalidatePath("/schedule");
+  revalidatePath("/accounts");
   return { ok: true };
 }
 
@@ -261,13 +286,18 @@ export async function generateLessonsForAccount(accountId: string): Promise<{
     activeLessons.map((l) => l.date + "__" + l.time)
   );
 
-  // 起始日:直接用規則的 start_date，沒填則從今天
+  // 起始日:以帳戶的 start_lesson_date 為唯一權威來源。
+  // 業務語意:學生從某一天開始上課,該帳戶所有排課規則(週二/週五等不同時段)
+  // 一律從那天起算,不再各自持有起始日。
+  // 回退順序:帳戶起始日 → 規則最早起始日(舊資料相容) → 今天
   // 允許過去日期(補錄歷史課程用)
   const today = todayYMD();
   const ruleStartDates = rules.map((r) => r.start_date).filter(Boolean) as string[];
-  const startDate = ruleStartDates.length > 0
-    ? ruleStartDates.reduce((a, b) => a < b ? a : b)
-    : today;
+  const startDate =
+    account.start_lesson_date ||
+    (ruleStartDates.length > 0
+      ? ruleStartDates.reduce((a, b) => (a < b ? a : b))
+      : today);
 
 
   // 預先載入所有衝突資料(跨學生老師衝突)

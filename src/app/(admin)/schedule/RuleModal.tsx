@@ -49,7 +49,14 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
   const [teacherId, setTeacherId] = useState(rule?.teacher_id || "");
   const [weekdays, setWeekdays] = useState<number[]>(rule?.weekdays || []);
   const [time, setTime] = useState(rule?.time || "");
-  const [startDate, setStartDate] = useState(rule?.start_date || "");
+  // 起始日屬於「帳戶」而非單條規則：同一帳戶的所有時段共用同一個開始日。
+  // 初始值優先取帳戶的 start_lesson_date，其次才是舊規則殘留的 start_date。
+  const initialAccountId = rule?.account_id || "";
+  const initialStartDate =
+    accounts.find((a) => a.id === initialAccountId)?.start_lesson_date ||
+    rule?.start_date ||
+    "";
+  const [startDate, setStartDate] = useState(initialStartDate);
   const [isPending, startTransition] = useTransition();
 
   const selectedAccount = accounts.find((a) => a.id === accountId);
@@ -79,6 +86,9 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
   const handleAccountChange = (id: string) => {
     setAccountId(id);
     setTeacherId("");
+    // 帶入該帳戶既有的起始日；沒有就清空讓使用者填
+    const acc = accounts.find((a) => a.id === id);
+    setStartDate(acc?.start_lesson_date || "");
   };
 
   const canSave = accountId && weekdays.length > 0 && time;
@@ -94,6 +104,8 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
         duration,
         start_date: startDate || null,
         end_date: null,
+        // 寫入 accounts.start_lesson_date，作為生成課程的唯一起始日來源
+        account_start_date: startDate || null,
       };
 
       const res = isEdit
@@ -225,7 +237,7 @@ export default function RuleModal({ rule, accounts, students, teachers, lessons,
         {/* 開始日期 */}
         <div>
           <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
-            開始日期(選填，留空從今天起)
+            開始日期(此帳戶所有時段共用，留空從今天起)
           </label>
           <input
             type="date"
