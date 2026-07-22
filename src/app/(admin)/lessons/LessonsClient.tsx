@@ -250,7 +250,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
     const count = selectedLessons.length;
     askConfirm({
       title: "批次取消",
-      message: "即將取消已選 " + count + " 堂課程。\n\n每堂都會自動在 +7 天建立延伸課(維持堂數守恆)。\n若需指定補課日期,請改為單堂取消。",
+      message: "即將取消已選 " + count + " 堂課程。\n\n每堂都會依排課規則,從該堂之後找第一個空的時段建立延伸課(維持堂數守恆)。\n若需指定補課日期,請改為單堂取消。",
       confirmLabel: "確認批次取消",
       danger: true,
       onConfirm: async () => {
@@ -321,7 +321,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
       <PageIntro storageKey="lessons" title="課程管理 · 說明">
         <p>每天上完課在這裡標記,標「完成」的才計入匯款結算與 Lee 收入。</p>
         <p>• <strong>完成</strong>:扣 1 堂並計入本期匯款。誤標可用「↺ 改回待上課」復原。</p>
-        <p>• <strong>取消</strong>:自動在 +7 天建立延伸課,維持堂數守恆。也可直接指定補課日期。</p>
+        <p>• <strong>取消</strong>:依排課規則,從該堂之後找第一個空的時段建立延伸課,維持堂數守恆。也可直接指定補課日期。</p>
         <p>• <strong>代課</strong>:依新老師費率更新 payout,原費率保存可撤銷。</p>
         <p>• 逾期未標記的課不計匯款,建議每天結束前處理完。</p>
       </PageIntro>

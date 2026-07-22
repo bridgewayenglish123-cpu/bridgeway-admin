@@ -316,15 +316,21 @@ export async function bookFlexLesson(data: {
 
   // 2. 帳戶內既有課程
   const { data: existing } = await supabase
-    .from("lessons").select("id,date,time,class_type,is_active").eq("account_id", data.account_id);
+    .from("lessons").select("id,date,time,class_type,status,is_active").eq("account_id", data.account_id);
   const active = (existing || []).filter((l) => l.is_active);
 
   // 3. 堂數上限
-  const generalCount = active.filter((l) => l.class_type === "general").length;
-  if (generalCount >= data.total_lessons) {
+  // 與 generateLessonsForAccount / UI 對話框同一套算法:
+  // completed + scheduled 全類型計入,cancelled 不算(已由 makeup/extension 取代)。
+  // 舊版用 class_type === "general" 過濾且不看 status,會把已取消的課
+  // 也算成佔用,導致誤判「已排滿」。
+  const usedCount = active.filter(
+    (l) => l.status === "completed" || l.status === "scheduled"
+  ).length;
+  if (usedCount >= data.total_lessons) {
     return {
       ok: false,
-      error: "此帳戶已排滿 " + generalCount + "/" + data.total_lessons + " 堂。\n若想換時間,建議到「課程管理」取消某堂 → 選「加補課」會更順(自動處理堂數守恆)。",
+      error: "此帳戶已排滿 " + usedCount + "/" + data.total_lessons + " 堂。\n若想換時間,建議到「課程管理」取消某堂 → 選「加補課」會更順(自動處理堂數守恆)。",
     };
   }
   const now = new Date().toISOString();
