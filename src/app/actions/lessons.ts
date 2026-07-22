@@ -132,14 +132,23 @@ export async function previewExtensionSlot(lessonId: string): Promise<{
     return { reason: "補課/延伸課取消後不再產生延伸" };
   }
 
+  // 規則查該「學生」所有帳戶,而非只查這堂課所屬帳戶。
+  // 續購後規則會搬到新帳戶,但舊帳戶可能仍有未上完的課;
+  // 只查單一帳戶會誤判成「無排課規則」。
+  const { data: stuAccounts } = await supabase
+    .from("accounts")
+    .select("id")
+    .eq("student_id", lesson.student_id);
+
+  const accIds = (stuAccounts || []).map((a: any) => a.id);
   const { data: rules } = await supabase
     .from("schedule_rules")
     .select("weekdays, time")
-    .eq("account_id", lesson.account_id)
+    .in("account_id", accIds.length > 0 ? accIds : [lesson.account_id])
     .eq("active_status", "Active");
 
   if (!rules || rules.length === 0) {
-    return { reason: "此帳戶無生效排課規則(彈性預約),不會自動延伸" };
+    return { reason: "此學生無生效排課規則(彈性預約),不會自動延伸" };
   }
 
   const slot = await findNextAvailableSlot(
@@ -232,10 +241,17 @@ export async function cancelLesson(
     // general 且無排課規則(彈性排課) → 不產生延伸
     const isGeneral = lesson.class_type === "general";
     if (isGeneral) {
+      // 同 previewExtensionSlot:規則查該學生所有帳戶
+      const { data: stuAccounts } = await supabase
+        .from("accounts")
+        .select("id")
+        .eq("student_id", lesson.student_id);
+      const accIds = (stuAccounts || []).map((a: any) => a.id);
+
       const { data: rules } = await supabase
         .from("schedule_rules")
         .select("id, weekdays, time")
-        .eq("account_id", lesson.account_id)
+        .in("account_id", accIds.length > 0 ? accIds : [lesson.account_id])
         .eq("active_status", "Active");
 
       let extDate: string | null = null;
