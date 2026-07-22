@@ -9,6 +9,52 @@ function uid(prefix = "ls") {
   return prefix + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
+/**
+ * 找出下一個可用的排課時段。
+ *
+ * 規則:從 fromDate 隔天開始往後找,回傳第一個「符合排課規則週幾」
+ * 且「該學生在該日期時間沒有其他課」的時段。
+ *
+ * 為什麼從 fromDate 之後找而非排到最後面:學生視角是一條連續時間線,
+ * 中間若有空位(例如續購起始日跳過的那週)應優先填補,
+ * 而不是把課推到所有已排課程之後。
+ *
+ * 為什麼衝突檢查用 student_id 而非 account_id:同一學生可能同時持有
+ * 多個帳戶(第一次購課未上完就續購),只檢查單一帳戶會排出重疊的課。
+ */
+async function findNextAvailableSlot(
+  supabase: any,
+  studentId: string,
+  rules: { weekdays: number[] | unknown; time: string }[],
+  fromDate: string,
+  maxDays = 90
+): Promise<{ date: string; time: string } | null> {
+  if (!rules || rules.length === 0) return null;
+
+  // 一次載入該學生所有已排/已完成課程,避免迴圈內逐日查詢
+  const { data: occupied } = await supabase
+    .from("lessons")
+    .select("date, time")
+    .eq("student_id", studentId)
+    .eq("is_active", true)
+    .in("status", ["scheduled", "completed"]);
+
+  const taken = new Set(
+    (occupied || []).map((l: any) => l.date + "__" + l.time)
+  );
+
+  let cursor = addDays(fromDate, 1);
+  for (let i = 0; i < maxDays; i++) {
+    const wd = new Date(cursor + "T00:00:00").getDay();
+    const match = rules.find((r) => (r.weekdays as number[]).includes(wd));
+    if (match && !taken.has(cursor + "__" + match.time)) {
+      return { date: cursor, time: match.time };
+    }
+    cursor = addDays(cursor, 1);
+  }
+  return null;
+}
+
 // ── 標記完成 ──────────────────────────────────────────────────────────────────
 export async function markLessonCompleted(lessonId: string) {
   const supabase = createClient();
@@ -146,51 +192,18 @@ export async function cancelLesson(
         .eq("active_status", "Active");
 
       let extDate: string | null = null;
+      let extTime: string | null = null;
 
       if (rules && rules.length > 0) {
-        // 起點:該「學生」所有帳戶中最後一堂已排課程之後。
-        // 學生視角是一條連續的時間線(第一次購課 8 堂 + 第二次購課 8 堂 = 16 堂),
-        // 帳戶只是財務上的分批。延伸課排到整條線最後面,
-        // 才不會與其他帳戶已排的課相撞。
-        const { data: lastLesson } = await supabase
-          .from("lessons")
-          .select("date")
-          .eq("student_id", lesson.student_id)
-          .eq("is_active", true)
-          .eq("status", "scheduled")
-          .order("date", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        const searchFrom = lastLesson?.date
-          ? addDays(lastLesson.date, 1)
-          : addDays(lesson.date, 1);
-
-        // 預先載入這個「學生」所有已排課程的日期+時間(跨帳戶)
-        const { data: existingLessons } = await supabase
-          .from("lessons")
-          .select("date, time")
-          .eq("student_id", lesson.student_id)
-          .eq("is_active", true)
-          .eq("status", "scheduled");
-
-        const existingKeys = new Set(
-          (existingLessons || []).map(l => l.date + "__" + l.time)
+        const slot = await findNextAvailableSlot(
+          supabase,
+          lesson.student_id,
+          rules as any,
+          lesson.date
         );
-
-        let cursor = searchFrom;
-        for (let i = 0; i < 90; i++) {
-          const wd = new Date(cursor + "T00:00:00").getDay();
-          const match = rules.find((r) => (r.weekdays as number[]).includes(wd));
-          if (match) {
-            // 檢查這天同時間是否已有課
-            const key = cursor + "__" + lesson.time;
-            if (!existingKeys.has(key)) {
-              extDate = cursor;
-              break;
-            }
-          }
-          cursor = addDays(cursor, 1);
+        if (slot) {
+          extDate = slot.date;
+          extTime = slot.time;
         }
       }
 
@@ -202,7 +215,7 @@ export async function cancelLesson(
           teacher_id: lesson.teacher_id,
           schedule_rule_id: null,
           date: extDate,
-          time: lesson.time,
+          time: extTime || lesson.time,
           duration: lesson.duration,
           class_type: "extension" as ClassType,
           status: "scheduled" as LessonStatus,
@@ -428,67 +441,50 @@ export async function deleteLesson(lessonId: string) {
           .eq("active_status", "Active");
 
         if (rules && rules.length > 0) {
-          // 找最後一堂已排課程
-          const { data: lastLesson } = await supabase
-            .from("lessons")
-            .select("date")
-            .eq("account_id", lessonToDelete.account_id)
-            .eq("is_active", true)
-            .eq("status", "scheduled")
-            .order("date", { ascending: false })
-            .limit(1)
-            .single();
+          // 與 cancelLesson 同一套邏輯:從被刪除那堂之後找第一個
+          // 符合規則且該學生無課的時段(跨帳戶檢查)。
+          const slot = await findNextAvailableSlot(
+            supabase,
+            acc.student_id,
+            rules as any,
+            lessonToDelete.date
+          );
 
-          const searchFrom = lastLesson?.date
-            ? addDays(lastLesson.date, 1)
-            : addDays(lessonToDelete.date, 1);
+          if (slot) {
+            // 取出該時段對應的規則(週幾 + 時間都要吻合),
+            // 以便帶入正確的老師與時長
+            const slotWd = new Date(slot.date + "T00:00:00").getDay();
+            const matchRule = rules.find(
+              (r) =>
+                (r.weekdays as number[]).includes(slotWd) && r.time === slot.time
+            );
 
-          // 找下一個符合規則的日期
-          let cursor = searchFrom;
-          let found = false;
-          for (let i = 0; i < 90 && !found; i++) {
-            const wd = new Date(cursor + "T00:00:00").getDay();
-            const matchRule = rules.find((r) => (r.weekdays as number[]).includes(wd));
             if (matchRule) {
-              // 檢查無衝突
-              const { data: conflict } = await supabase
-                .from("lessons")
-                .select("id")
-                .eq("student_id", acc.student_id)
-                .eq("is_active", true)
-                .eq("date", cursor)
-                .eq("time", matchRule.time)
-                .limit(1);
-
-              if (!conflict || conflict.length === 0) {
-                const now2 = new Date().toISOString();
-                await supabase.from("lessons").insert({
-                  id: uid("ls"),
-                  account_id: lessonToDelete.account_id,
-                  student_id: acc.student_id,
-                  teacher_id: matchRule.teacher_id || null,
-                  schedule_rule_id: matchRule.id,
-                  date: cursor,
-                  time: matchRule.time,
-                  duration: matchRule.duration,
-                  class_type: "general",
-                  status: "scheduled",
-                  is_active: true,
-                  is_backfill: false,
-                  original_class_id: null,
-                  original_payout_snapshot: null,
-                  is_substitute: false,
-                  original_teacher_id: null,
-                  payout_snapshot: lessonToDelete.payout_snapshot,
-                  note: null,
-                  superseded: false,
-                  created_at: now2,
-                  updated_at: now2,
-                });
-                found = true;
-              }
+              const now2 = new Date().toISOString();
+              await supabase.from("lessons").insert({
+                id: uid("ls"),
+                account_id: lessonToDelete.account_id,
+                student_id: acc.student_id,
+                teacher_id: matchRule.teacher_id || null,
+                schedule_rule_id: matchRule.id,
+                date: slot.date,
+                time: slot.time,
+                duration: matchRule.duration,
+                class_type: "general",
+                status: "scheduled",
+                is_active: true,
+                is_backfill: false,
+                original_class_id: null,
+                original_payout_snapshot: null,
+                is_substitute: false,
+                original_teacher_id: null,
+                payout_snapshot: lessonToDelete.payout_snapshot,
+                note: null,
+                superseded: false,
+                created_at: now2,
+                updated_at: now2,
+              });
             }
-            cursor = addDays(cursor, 1);
           }
         }
       }
