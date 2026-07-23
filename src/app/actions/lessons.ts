@@ -27,7 +27,7 @@ async function findNextAvailableSlot(
   studentId: string,
   rules: { weekdays: number[] | unknown; time: string }[],
   fromDate: string,
-  maxDays = 90
+  extraDays = 60
 ): Promise<{ date: string; time: string } | null> {
   if (!rules || rules.length === 0) return null;
 
@@ -42,6 +42,20 @@ async function findNextAvailableSlot(
   const taken = new Set(
     (occupied || []).map((l: any) => l.date + "__" + l.time)
   );
+
+  // 搜尋範圍不能是固定天數:32 堂的帳戶排下去橫跨 4 個月以上,
+  // 寫死 90 天會在「隊伍還沒走完」時就放棄,誤報找不到時段。
+  // 改為「一路找到該學生最後一堂課之後,再加 extraDays 緩衝」。
+  const lastDate = (occupied || []).reduce(
+    (acc: string, l: any) => (l.date > acc ? l.date : acc),
+    fromDate
+  );
+  const daysBetween = Math.ceil(
+    (new Date(lastDate + "T00:00:00").getTime() -
+      new Date(fromDate + "T00:00:00").getTime()) /
+      86400000
+  );
+  const maxDays = Math.max(daysBetween, 0) + extraDays;
 
   let cursor = addDays(fromDate, 1);
   for (let i = 0; i < maxDays; i++) {
@@ -157,7 +171,7 @@ export async function previewExtensionSlot(lessonId: string): Promise<{
     rules as any,
     lesson.date
   );
-  if (!slot) return { reason: "90 天內找不到可用時段" };
+  if (!slot) return { reason: "找不到可用時段(排課規則可能已停用)" };
 
   const WD = ["日", "一", "二", "三", "四", "五", "六"];
   const wd = new Date(slot.date + "T00:00:00").getDay();
