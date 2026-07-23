@@ -143,7 +143,7 @@ export async function previewExtensionSlot(lessonId: string): Promise<{
   if (!lesson) return { reason: "找不到課程" };
 
   if (lesson.class_type !== "general") {
-    return { reason: "補課/延伸課取消後不再產生延伸" };
+    return { reason: "此為補課/延伸課,取消後不會自動再延伸。堂數會退回,可到排課管理重新安排。" };
   }
 
   // 規則查該「學生」所有帳戶,而非只查這堂課所屬帳戶。
@@ -162,7 +162,7 @@ export async function previewExtensionSlot(lessonId: string): Promise<{
     .eq("active_status", "Active");
 
   if (!rules || rules.length === 0) {
-    return { reason: "此學生無生效排課規則(彈性預約),不會自動延伸" };
+    return { reason: "此學生無生效排課規則(彈性預約),不會自動延伸。堂數會退回,可到排課管理重新安排。" };
   }
 
   const slot = await findNextAvailableSlot(
@@ -171,7 +171,7 @@ export async function previewExtensionSlot(lessonId: string): Promise<{
     rules as any,
     lesson.date
   );
-  if (!slot) return { reason: "找不到可用時段(排課規則可能已停用)" };
+  if (!slot) return { reason: "找不到可用時段,不會自動延伸。堂數會退回,可到排課管理重新安排。" };
 
   const WD = ["日", "一", "二", "三", "四", "五", "六"];
   const wd = new Date(slot.date + "T00:00:00").getDay();

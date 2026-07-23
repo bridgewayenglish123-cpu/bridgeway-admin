@@ -104,7 +104,7 @@ export default function CancelModal({ lesson, account, teachers, onDone, onError
                   ，堂數守恆。
                 </>
               ) : (
-                <>不會產生延伸課：{preview.reason}</>
+                <>{preview.reason}</>
               )}
             </div>
             <div className="text-sm font-medium" style={{ color: C.navy }}>
