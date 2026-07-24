@@ -27,7 +27,16 @@ function ClassroomCreateForm({ student, onDone, onToast }: { student: { id: stri
           onClick={() => startTransition(async () => {
             const res = await createClassroomAccount({ studentId: student.id, email, password, zhName: student.zh_name });
             if (res.error) onToast(res.error, false);
-            else { onToast(`${student.zh_name} 的 Classroom 帳號已開通`); onDone(); }
+            else {
+              // 存密碼備註,方便日後在學生列表查看(與老師 Portal 同一套做法)
+              await fetch("/api/update-student-hint", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ studentId: student.id, hint: password }),
+              });
+              onToast(`${student.zh_name} 的 Classroom 帳號已開通`);
+              onDone();
+            }
           })}>
           {isPending ? "開通中…" : "開通帳號"}
         </button>
@@ -37,7 +46,7 @@ function ClassroomCreateForm({ student, onDone, onToast }: { student: { id: stri
 }
 
 // ── Classroom 管理帳號表單 ────────────────────────────────────────────────────
-function ClassroomManageForm({ student, onDone, onToast }: { student: { id: string; zh_name: string; auth_user_id: string | null }; onDone: () => void; onToast: (msg: string, ok?: boolean) => void }) {
+function ClassroomManageForm({ student, onDone, onToast }: { student: { id: string; zh_name: string; auth_user_id: string | null; portal_password_hint?: string | null }; onDone: () => void; onToast: (msg: string, ok?: boolean) => void }) {
   const [password, setPassword] = useState("");
   const [isPending, startTransition] = useTransition();
   return (
@@ -45,6 +54,11 @@ function ClassroomManageForm({ student, onDone, onToast }: { student: { id: stri
       <div className="rounded-lg px-3 py-2 text-xs" style={{ background: "#E8F5E9", color: "#2E7D32" }}>
         ✓ Classroom 帳號已開通
       </div>
+      {student.portal_password_hint && (
+        <div className="rounded-lg px-3 py-2 text-xs" style={{ background: "#F5F1E8", color: "#6B7B8E" }}>
+          目前密碼：<strong style={{ color: "#1A2236" }}>{student.portal_password_hint}</strong>
+        </div>
+      )}
       <div>
         <label className="block text-xs font-semibold mb-1" style={{ color: "#6B7B8E" }}>重設密碼</label>
         <input type="text" className="w-full rounded-lg border px-3 py-2 text-sm"
@@ -59,7 +73,15 @@ function ClassroomManageForm({ student, onDone, onToast }: { student: { id: stri
             if (!confirm("確定要刪除此帳號？")) return;
             const res = await deleteClassroomAccount({ studentId: student.id, authUserId: student.auth_user_id! });
             if (res.error) onToast(res.error, false);
-            else { onToast("帳號已刪除"); onDone(); }
+            else {
+              await fetch("/api/update-student-hint", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ studentId: student.id, hint: null }),
+              });
+              onToast("帳號已刪除");
+              onDone();
+            }
           })}>刪除帳號</button>
         <button
           disabled={!password || password.length < 8 || !student.auth_user_id || isPending}
@@ -68,7 +90,15 @@ function ClassroomManageForm({ student, onDone, onToast }: { student: { id: stri
           onClick={() => startTransition(async () => {
             const res = await resetClassroomPassword({ authUserId: student.auth_user_id!, newPassword: password });
             if (res.error) onToast(res.error, false);
-            else { onToast("密碼已重設"); onDone(); }
+            else {
+              await fetch("/api/update-student-hint", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ studentId: student.id, hint: password }),
+              });
+              onToast("密碼已重設");
+              onDone();
+            }
           })}>
           {isPending ? "儲存中…" : "重設密碼"}
         </button>
