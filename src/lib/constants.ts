@@ -38,6 +38,7 @@ export const TABS = [
   { key: "rules", label: "價格規則" },
   { key: "reports", label: "報告管理" },
   { key: "remit", label: "匯款總覽" },
+  { key: "settings", label: "設定" },
 ];
 
 export const ACC_STATUS_LABEL: Record<string, string> = {

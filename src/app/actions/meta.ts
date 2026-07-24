@@ -9,6 +9,7 @@ export async function setEmailNotifications(enabled: boolean) {
     .update({ email_notifications_enabled: enabled, updated_at: new Date().toISOString() })
     .eq("id", 1);
   if (error) return { error: error.message };
+  revalidatePath("/settings");
   revalidatePath("/");
   return { ok: true };
 }
