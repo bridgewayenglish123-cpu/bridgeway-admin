@@ -425,6 +425,7 @@ export async function generateLessonsForAccount(accountId: string): Promise<{
 
   revalidatePath("/schedule");
   revalidatePath("/lessons");
+  revalidatePath("/accounts");
   revalidatePath("/");
   return { ok: true, added, skipped };
 }
@@ -456,6 +457,7 @@ export async function generateAll(): Promise<{
 
   revalidatePath("/schedule");
   revalidatePath("/lessons");
+  revalidatePath("/accounts");
   revalidatePath("/");
   return { ok: true, totalAdded, accountCount: accountIds.length };
 }
@@ -515,6 +517,7 @@ export async function clearAndRegenerate(accountId: string): Promise<{
 
   revalidatePath("/schedule");
   revalidatePath("/lessons");
+  revalidatePath("/accounts");
   revalidatePath("/");
   return { ok: true, deleted: deleteIds.length, added: genResult.added || 0 };
 }
