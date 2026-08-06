@@ -1019,6 +1019,42 @@ export default function AccountsClient({ accounts, students, teachers, lessons, 
                       彈性排課
                     </Btn>
                   </div>
+                  {expandedIds.has(acc.id) && (() => {
+                    const accLessons = lessons
+                      .filter((l) => l.account_id === acc.id && l.is_active)
+                      .sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")));
+                    return (
+                      <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${C.line}` }}>
+                        <div className="text-[11px] font-semibold mb-2" style={{ color: C.muted }}>
+                          課程明細({accLessons.length} 堂)
+                        </div>
+                        {accLessons.length === 0 ? (
+                          <div className="text-[12px] py-1" style={{ color: C.muted }}>
+                            此帳戶尚無課程紀錄。到「排課管理」設定規則,或點「彈性排課」手動加。
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-2">
+                            {accLessons.map((l) => (
+                              <div key={l.id} className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-2" style={{ background: "#FAFBFC", border: `1px solid ${C.line}` }}>
+                                <div className="min-w-0">
+                                  <div className="text-[12px] font-medium" style={{ color: C.navy }}>
+                                    {l.date} <span style={{ color: C.muted }}>{l.time || "—"}</span>
+                                  </div>
+                                  <div className="text-[11px]" style={{ color: C.muted }}>
+                                    {teacherById[l.teacher_id || ""]?.teacher_name || "未指派"}
+                                    {l.class_type === "makeup" ? " · 補課" : l.class_type === "extension" ? " · 延伸" : ""}
+                                  </div>
+                                </div>
+                                <Badge tone={l.status === "completed" ? "green" : l.status === "cancelled" ? "red" : "gray"}>
+                                  {l.status === "completed" ? "已完成" : l.status === "cancelled" ? "已取消" : "待上"}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </MobileCard>
               );
             })}
