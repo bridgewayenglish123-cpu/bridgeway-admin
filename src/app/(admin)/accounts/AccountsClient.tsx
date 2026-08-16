@@ -165,6 +165,7 @@ function OpenAccountForm({
         payment_date: paymentDate,
         note,
         snapshot: newSnapshot,
+        auto_copy_schedule: autoCopySchedule,
       });
       return;
     }
@@ -192,6 +193,7 @@ function OpenAccountForm({
       payment_date: paymentDate,
       note,
       snapshot,
+      auto_copy_schedule: autoCopySchedule,
     });
   };
 
@@ -419,6 +421,23 @@ function OpenAccountForm({
           onChange={(e) => setNote(e.target.value)}
         />
       </div>
+      {/* 複製排課規則選項 */}
+      <label className="flex items-start gap-2 cursor-pointer rounded-lg p-3"
+        style={{ background: "#F0EDE6", border: `1px solid ${C.line}` }}>
+        <input
+          type="checkbox"
+          className="mt-0.5 flex-shrink-0"
+          checked={autoCopySchedule}
+          onChange={e => setAutoCopySchedule(e.target.checked)}
+        />
+        <div>
+          <div className="text-sm font-medium" style={{ color: C.navy }}>自動複製上一期排課規則</div>
+          <div className="text-xs mt-0.5" style={{ color: C.muted }}>
+            勾選後系統會將上一個帳戶的排課時間複製到新帳戶，適合同時段續課。
+            新課程或改時間請不要勾選。
+          </div>
+        </div>
+      </label>
       <div className="flex justify-end gap-2 pt-1">
         <Btn kind="ghost" size="sm" onClick={onCancel} disabled={isPending}>取消</Btn>
         <Btn kind="primary" size="sm" disabled={!canSave || isPending} onClick={handleSave}>

@@ -47,6 +47,7 @@ export interface OpenAccountInput {
     hanne_share_ntd: number;
     lee_commission_ntd: number;
   };
+  auto_copy_schedule?: boolean;
 }
 
 export async function openAccount(input: OpenAccountInput) {
@@ -88,7 +89,8 @@ export async function openAccount(input: OpenAccountInput) {
     return { error: acErr.message };
   }
   revalidatePath("/accounts");
-  // 自動複製舊帳戶排課規則到新帳戶
+  // 自動複製舊帳戶排課規則到新帳戶（只在明確要求時執行）
+  if (!input.auto_copy_schedule) return { ok: true };
   try {
     const { data: prevAccounts } = await supabase
       .from("accounts")
