@@ -146,6 +146,8 @@ function OpenAccountForm({
         original_price_ntd: oldRule.price_ntd,
         lesson_count: oldRule.lesson_count,
         teacher_payout_ntd: oldRule.teacher_payout_ntd,
+        teacher_payout_currency: (oldRule.teacher_payout_currency || 'NTD') as 'NTD' | 'PHP',
+        teacher_payout_php: oldRule.teacher_payout_php || null,
         hanne_share_ntd: oldRule.hanne_share_ntd,
         lee_commission_ntd: lee,
       };
@@ -171,6 +173,8 @@ function OpenAccountForm({
       original_price_ntd: rule.price_ntd,
       lesson_count: rule.lesson_count,
       teacher_payout_ntd: rule.teacher_payout_ntd,
+      teacher_payout_currency: (rule.teacher_payout_currency || 'NTD') as 'NTD' | 'PHP',
+      teacher_payout_php: rule.teacher_payout_php || null,
       hanne_share_ntd: rule.hanne_share_ntd,
       lee_commission_ntd: Math.round(rule.price_ntd / rule.lesson_count) - rule.teacher_payout_ntd - rule.hanne_share_ntd,
     };

@@ -103,10 +103,15 @@ export function calcPeriodRows(
     else if (cat === "s25") row.s25++;
     else row.l55++;
     row.total++;
-    row.payoutNtd += l.payout_snapshot?.teacher_payout_ntd || 0;
+    // PHP 規則：用 PHP 金額 / 匯率；NTD 規則：直接用 NTD 金額
+    const snap = l.payout_snapshot || ({} as any);
+    if (snap.teacher_payout_currency === 'PHP' && snap.teacher_payout_php) {
+      row.payoutNtd += Math.round((snap.teacher_payout_php / phpRate) * 100) / 100;
+    } else {
+      row.payoutNtd += snap.teacher_payout_ntd || 0;
+    }
     // hanneNtd 只計入 Hanne 老師自己的抽成(teacher_type=Hanne)
     // Other 老師課程的 hanne_share 單獨匯總，不計入該老師應得
-    const snap = l.payout_snapshot || ({} as any);
     const isHanneTeacher = teachers.find((t) => t.id === l.teacher_id)?.teacher_type === "Hanne";
     if (isHanneTeacher) {
       row.hanneNtd += effectiveHanneShare(l);
