@@ -74,7 +74,8 @@ export function calcPeriodRows(
   periodKey: string,
   lessons: Lesson[],
   teachers: Teacher[],
-  accountById: Record<string, Account>
+  accountById: Record<string, Account>,
+  phpRate: number = 1.8
 ): { rows: TeacherPeriodRow[]; totalPayoutNtd: number; totalLeeNtd: number; hanneCommissionNtd: number; lessonCount: number; studentCount: number } {
   const period = periodOf(periodKey);
   const periodLessons = lessons.filter(
