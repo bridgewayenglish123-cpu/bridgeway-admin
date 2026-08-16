@@ -4,9 +4,10 @@ import RulesClient from "./RulesClient";
 
 async function loadData() {
   const supabase = createClient();
-  const [rulesRes, accountsRes] = await Promise.all([
+  const [rulesRes, accountsRes, metaRes] = await Promise.all([
     supabase.from("price_rules").select("*").order("teacher_type").order("duration_type").order("billing_type").order("lesson_count"),
     supabase.from("accounts").select("id,price_rule_code: enrollment_id").select("id,student_id"),
+    supabase.from("app_meta").select("php_rate").eq("id", 1).single(),
   ]);
   // 計算每條規則被幾個帳戶使用(透過 enrollments)
   const { data: enrollments } = await supabase.from("enrollments").select("price_rule_code");
@@ -19,6 +20,7 @@ async function loadData() {
   return {
     rules: (rulesRes.data || []) as PriceRule[],
     usageCounts,
+    phpRate: metaRes.data?.php_rate || 1.8,
   };
 }
 

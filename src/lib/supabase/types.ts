@@ -15,6 +15,8 @@ export interface PayoutSnapshot {
   original_price_ntd: number;
   lesson_count: number;
   teacher_payout_ntd: number;
+  teacher_payout_currency?: 'NTD' | 'PHP';
+  teacher_payout_php?: number | null;
   hanne_share_ntd: number;
   lee_commission_ntd: number;
 }
@@ -60,6 +62,8 @@ export interface PriceRule {
   lesson_count: number;
   price_ntd: number;
   teacher_payout_ntd: number;
+  teacher_payout_currency: 'NTD' | 'PHP';
+  teacher_payout_php: number | null;
   hanne_share_ntd: number;
   validity_days: number | null;
   active_status: ActiveStatus;

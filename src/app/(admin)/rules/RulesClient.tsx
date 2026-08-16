@@ -17,6 +17,7 @@ import { togglePriceRule } from "@/app/actions/rules";
 interface Props {
   rules: PriceRule[];
   usageCounts: Record<string, number>;
+  phpRate: number;
 }
 
 type ModalState =
@@ -46,7 +47,7 @@ const BILLING_LABEL: Record<string, string> = {
   Package: "套裝",
 };
 
-export default function RulesClient({ rules, usageCounts }: Props) {
+export default function RulesClient({ rules, usageCounts, phpRate }: Props) {
   const [modal, setModal] = useState<ModalState>({ kind: "none" });
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -121,9 +122,12 @@ export default function RulesClient({ rules, usageCounts }: Props) {
             {rules.length === 0 ? "還沒有任何價格規則。" : "沒有符合條件的規則。"}
           </Empty>
         ) : (
-          <Table head={["代碼", "方案名稱", "老師類型", "時長", "計費", "堂數", "售價", "老師抽成(每堂)", "Hanne 抽成(每堂)", "Lee 利潤(總)", "使用", "狀態", "操作"]}>
+          <Table head={["代碼", "方案名稱", "老師類型", "時長", "計費", "堂數", "售價", "薪資制度", "老師薪資(每堂)", "Hanne 抽成(每堂)", "Lee 利潤(總)", "使用", "狀態", "操作"]}>
             {filtered.map((r) => {
-              const lee = r.price_ntd - (r.teacher_payout_ntd * r.lesson_count) - (r.hanne_share_ntd * r.lesson_count);
+              const teacherCostNtd = r.teacher_payout_currency === 'PHP' && r.teacher_payout_php
+                ? r.teacher_payout_php / phpRate
+                : r.teacher_payout_ntd;
+              const lee = r.price_ntd - (teacherCostNtd * r.lesson_count) - (r.hanne_share_ntd * r.lesson_count);
               const usage = usageCounts[r.price_rule_code] || 0;
               const isActive = r.active_status === "Active";
               return (
@@ -148,7 +152,33 @@ export default function RulesClient({ rules, usageCounts }: Props) {
                   <Td><span className="text-xs" style={{ color: C.muted }}>{BILLING_LABEL[r.billing_type] || r.billing_type}</span></Td>
                   <Td><span className="text-sm">{r.lesson_count}</span></Td>
                   <Td><span className="text-sm">NT$ {money(r.price_ntd)}</span></Td>
-                  <Td><span className="text-sm" style={{ color: C.text }}>NT$ {money(r.teacher_payout_ntd)}</span></Td>
+                  <Td>
+                    {r.teacher_payout_currency === 'PHP' ? (
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: '#EEF2FF', color: '#3730A3' }}>
+                        PHP 新制
+                      </span>
+                    ) : (
+                      <span className="text-xs px-2 py-0.5 rounded-full"
+                        style={{ background: '#F0EDE6', color: C.muted }}>
+                        NTD 舊制
+                      </span>
+                    )}
+                  </Td>
+                  <Td>
+                    {r.teacher_payout_currency === 'PHP' && r.teacher_payout_php ? (
+                      <div>
+                        <span className="text-sm font-semibold" style={{ color: '#3730A3' }}>
+                          PHP {r.teacher_payout_php}
+                        </span>
+                        <span className="text-xs block" style={{ color: C.muted }}>
+                          ≈ NT${(r.teacher_payout_php / phpRate).toFixed(2)}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-sm" style={{ color: C.text }}>NT$ {money(r.teacher_payout_ntd)}</span>
+                    )}
+                  </Td>
                   <Td><span className="text-sm" style={{ color: C.muted }}>NT$ {money(r.hanne_share_ntd)}</span></Td>
                   <Td>
                     <span className="text-sm font-medium" style={{ color: lee >= 0 ? C.green : C.red }}>
@@ -185,6 +215,7 @@ export default function RulesClient({ rules, usageCounts }: Props) {
       {(modal.kind === "add" || modal.kind === "edit") && (
         <RuleFormModal
           rule={modal.kind === "edit" ? modal.rule : null}
+          phpRate={phpRate}
           onDone={(msg) => { showToast(msg); closeModal(); }}
           onError={(msg) => showToast(msg, false)}
           onClose={closeModal}

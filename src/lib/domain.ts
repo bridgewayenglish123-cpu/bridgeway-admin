@@ -75,3 +75,29 @@ export function effectiveLeeCommission(lesson: Lesson): number {
   }
   return stored;
 }
+
+// ---- PHP 薪資換算 ----
+// Source of truth: PHP amount in price rule
+// NTD is display-only for Lee profit calculation
+export function effectiveTeacherPayoutNtd(
+  snapshot: PayoutSnapshot,
+  phpRate: number
+): number {
+  if (snapshot.teacher_payout_currency === 'PHP' && snapshot.teacher_payout_php) {
+    // PHP → NTD 換算，保留2位小數
+    return Math.round((snapshot.teacher_payout_php / phpRate) * 100) / 100;
+  }
+  // Legacy NTD: 直接回傳
+  return snapshot.teacher_payout_ntd || 0;
+}
+
+// Lee 利潤計算（支援新舊制度）
+export function effectiveLeeCommissionWithPhp(
+  lesson: Lesson,
+  phpRate: number
+): number {
+  const s = lesson.payout_snapshot || ({} as PayoutSnapshot);
+  const hanneShare = isPostHanneCutoff(lesson.date) ? 0 : (s.hanne_share_ntd || 0);
+  const teacherCostNtd = effectiveTeacherPayoutNtd(s, phpRate);
+  return (s.original_price_ntd || 0) - teacherCostNtd - hanneShare;
+}

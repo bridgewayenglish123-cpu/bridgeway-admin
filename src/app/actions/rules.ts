@@ -18,6 +18,8 @@ export async function createPriceRule(data: {
   lesson_count: number;
   price_ntd: number;
   teacher_payout_ntd: number;
+  teacher_payout_currency: 'NTD' | 'PHP';
+  teacher_payout_php: number | null;
   hanne_share_ntd: number;
   validity_days: number | null;
 }) {
@@ -46,6 +48,8 @@ export async function updatePriceRule(id: string, data: {
   lesson_count: number;
   price_ntd: number;
   teacher_payout_ntd: number;
+  teacher_payout_currency: 'NTD' | 'PHP';
+  teacher_payout_php: number | null;
   hanne_share_ntd: number;
   validity_days: number | null;
 }) {
