@@ -186,7 +186,7 @@ export default function RemitClient({ teachers, accounts, lessons, periods, extr
 
   // 本期計算
   const cur = useMemo(
-    () => calcPeriodRows(curPeriodKey, lessons, teachers, accountById),
+    () => calcPeriodRows(curPeriodKey, lessons, teachers, accountById, phpRate),
     [curPeriodKey, lessons, teachers, accountById]
   );
 
@@ -200,7 +200,7 @@ export default function RemitClient({ teachers, accounts, lessons, periods, extr
   const prevPeriodKeys = allPeriodKeys.filter((k) => k !== curPeriodKey);
   const prevKey = prevPeriodKeys[0];
   const prev = useMemo(
-    () => (prevKey ? calcPeriodRows(prevKey, lessons, teachers, accountById) : null),
+    () => (prevKey ? calcPeriodRows(prevKey, lessons, teachers, accountById, phpRate) : null),
     [prevKey, lessons, teachers, accountById]
   );
   const prevLeeNtd = prev?.totalLeeNtd || 0;
