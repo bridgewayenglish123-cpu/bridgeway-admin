@@ -91,6 +91,7 @@ function OpenAccountForm({
   const [courseLabel, setCourseLabel] = useState("");
   const [paymentDate, setPaymentDate] = useState(todayYMD());
   const [note, setNote] = useState(prefillNote || "");
+  const [autoCopySchedule, setAutoCopySchedule] = useState(false);
   const [prevSnap, setPrevSnap] = useState<{
     snapshot: { original_price_ntd: number; lesson_count: number; teacher_payout_ntd: number; hanne_share_ntd: number; lee_commission_ntd: number };
     course_label: string;
