@@ -47,7 +47,7 @@ export async function POST(request: Request) {
   const resend = new Resend(process.env.RESEND_API_KEY!);
 
   try {
-    const { lessonId, vttContent, teacherNote, existingReportId, manualInput, confirmedVocab } =
+    const { lessonId, vttContent, teacherNote, existingReportId, manualInput, confirmedVocab, nextFocus } =
       await request.json();
 
     if (!lessonId || (!vttContent && !manualInput)) {
@@ -249,7 +249,7 @@ ${transcript}
     "headline": "Annie, you made real progress today.",
     "body": "Specific, warm English analysis, 2-4 sentences."
   },
-  "next_focus": "2-4 specific teaching recommendations based on what this student needs most. Written in English. Each recommendation on its own line, no numbering, no bullet points.",
+  "next_focus_zh": "把老師提供的「下堂課重點」翻譯成繁體中文。只翻譯，不改寫、不優化、不增減內容。若老師未提供則回 null。",
   "reflection_question": {
     "zh": "針對本課學習點的語言輸出練習題（用中文說明）。必須是造句、口說或寫作練習，例如：用今天學的單字造一個關於自己生活的句子，或用英文寫3句描述最近做的事（用過去式）。禁止問課文情節或故事內容。",
     "en": "A language output practice prompt directly tied to today's learning point. Must be a speaking or writing exercise, e.g. use a vocabulary word in a sentence about your own life, or write 3 sentences about something you did recently using past tense. Do NOT ask about the story plot or characters."
@@ -294,7 +294,9 @@ ${transcript}
       strengths: report.strengths,
       errors: report.errors,
       comparison: report.comparison,
-      next_focus: report.next_focus,
+      next_focus: (nextFocus && String(nextFocus).trim())
+        ? { en: String(nextFocus).trim(), zh: report.next_focus_zh ?? null }
+        : null,
       milestone,
     };
 

@@ -76,6 +76,7 @@ export default function UploadReportModal({
   const [manualPhrases, setManualPhrases] = useState("");
   const [manualErrors, setManualErrors] = useState("");
   const [manualNextFocus, setManualNextFocus] = useState("");
+  const [nextFocus, setNextFocus] = useState("");
 
   const busy = isLoading;
 
@@ -122,7 +123,7 @@ export default function UploadReportModal({
     setIsLoading(true);
     try {
       const body = mode === "vtt"
-        ? { lessonId, vttContent, teacherNote: note.trim() || undefined, existingReportId, confirmedVocab: { words, phrases } }
+        ? { lessonId, vttContent, teacherNote: note.trim() || undefined, existingReportId, confirmedVocab: { words, phrases }, nextFocus: nextFocus.trim() || undefined }
         : { lessonId, existingReportId, manualInput: { performance: manualPerformance, vocabulary: manualVocab, phrases: manualPhrases, errors: manualErrors, nextFocus: manualNextFocus, teacherNote: note } };
 
       const res = await fetch("/api/generate-report", {
@@ -261,6 +262,18 @@ export default function UploadReportModal({
               </div>
             )}
             <div>
+              <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
+                Next Lesson Focus <span style={{ color: C.red }}>*</span>
+              </label>
+              <textarea className="w-full rounded-lg border px-3 py-2 text-sm"
+                style={{ borderColor: nextFocus.trim() ? C.line : C.amber, color: C.text, minHeight: 60, resize: "vertical" }}
+                placeholder="e.g. We'll focus on past tense verbs next time."
+                value={nextFocus} onChange={(e) => setNextFocus(e.target.value)} disabled={busy} />
+              <div className="text-xs mt-1" style={{ color: C.muted }}>
+                老師原文（系統會自動翻譯中文給學生看）
+              </div>
+            </div>
+            <div>
               <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>Teacher Note (optional)</label>
               <textarea className="w-full rounded-lg border px-3 py-2 text-sm"
                 style={{ borderColor: C.line, color: C.text, minHeight: 60, resize: "vertical" }}
@@ -281,7 +294,7 @@ export default function UploadReportModal({
             <div className="flex items-center justify-end gap-2">
               {busy && <span className="text-xs mr-auto" style={{ color: C.muted }}>Analyzing vocabulary, please wait...</span>}
               <Btn kind="ghost" size="sm" onClick={onClose} disabled={busy}>Close</Btn>
-              <Btn kind="gold" size="sm" onClick={handleExtractVocab} disabled={!file || busy}>
+              <Btn kind="gold" size="sm" onClick={handleExtractVocab} disabled={!file || !nextFocus.trim() || busy}>
                 {busy ? "Analyzing..." : "下一步：Review Vocabulary"}
               </Btn>
             </div>
