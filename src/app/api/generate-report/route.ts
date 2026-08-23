@@ -240,7 +240,7 @@ ${transcript}
   },
   "hidden_gem": "A specific moment from today's lesson that the student might not have noticed — something genuinely impressive or meaningful. Write in warm, story-like Chinese (2-3 sentences). IMPORTANT: Only include this if there is a truly remarkable moment worth highlighting. If nothing stands out, return null.",
   "next_challenge": "A specific, personal challenge for the student to try before next lesson. NOT course content — a language challenge targeting their specific weakness. Write in Chinese, 1-2 sentences, with a hint of excitement. Example: '下次試試看：當你想說「因為」的時候，你能不能不用 because？看你能想出幾種說法。' Adjust difficulty and tone based on learner_type.",
-  "parent_summary": "ONLY include if learner_type is 'Young Learner'. A warm, informative summary for parents (2-3 sentences in Traditional Chinese). Cover: what the child learned today, one specific moment of progress the parent would be proud of, and one thing to encourage at home. If learner_type is NOT 'Young Learner', return null.",
+  "parent_summary": "[CRITICAL] If learner_type is Young Learner: MUST return a non-null string in Traditional Chinese (2-3 sentences for parents). Cover: what the child learned today, one proud moment of progress, one thing to encourage at home. NEVER return null for Young Learner. Example: \"今天 Mia 學習了日常生活詞彙，能夠用完整句子回答問題，進步非常明顯！建議在家可以和她練習說說看今天做了什麼。\" If learner_type is NOT Young Learner: return null.",
   "analysis_zh": {
     "headline": "Annie，你這堂課真的有進步。",
     "body": "具體、有溫度的中文分析，2-4句。"
