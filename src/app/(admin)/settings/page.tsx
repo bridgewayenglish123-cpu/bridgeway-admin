@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { EmailToggle } from "../EmailToggle";
 import PasswordCard from "./PasswordCard";
 import PageIntro from "@/components/ui/PageIntro";
+import ReminderStartDate from "./ReminderStartDate";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +14,11 @@ export default async function SettingsPage() {
 
   const { data: meta } = await supabase
     .from("app_meta")
-    .select("email_notifications_enabled")
+    .select("email_notifications_enabled, reminder_start_date")
     .eq("id", 1)
     .maybeSingle();
   const emailEnabled = meta?.email_notifications_enabled ?? false;
+  const reminderStartDate = meta?.reminder_start_date ?? null;
 
   return (
     <div className="space-y-4">
@@ -27,6 +29,7 @@ export default async function SettingsPage() {
       <div className="space-y-4 max-w-2xl">
         <PasswordCard email={user?.email ?? null} />
         <EmailToggle enabled={emailEnabled} />
+        <ReminderStartDate current={reminderStartDate} />
       </div>
     </div>
   );
