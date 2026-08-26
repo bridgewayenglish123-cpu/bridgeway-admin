@@ -8,7 +8,7 @@ export type StudentStatus = "Active" | "Paused" | "Closed";
 export type BillingType = "Trial" | "Single" | "Package";
 export type CourseFamily = "General" | "Trial";
 export type DurationType = "Short25" | "Long55" | "Trial25";
-export type LessonStatus = "scheduled" | "completed" | "cancelled";
+export type LessonStatus = "scheduled" | "completed" | "cancelled" | "pending_confirmation";
 export type ClassType = "general" | "makeup" | "extension";
 
 export interface PayoutSnapshot {
