@@ -30,6 +30,17 @@ const EMPTY = {
   hanne_share_ntd: "0",
 };
 
+function F({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
+        {label}{required && <span style={{ color: C.red }}> *</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
 export default function RuleFormModal({ rule, phpRate, onDone, onError, onClose }: Props) {
   const isEdit = !!rule;
   const [form, setForm] = useState({
@@ -102,26 +113,7 @@ export default function RuleFormModal({ rule, phpRate, onDone, onError, onClose 
     });
   };
 
-  const F = ({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) => (
-    <div>
-      <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
-        {label}{required && <span style={{ color: C.red }}> *</span>}
-      </label>
-      {children}
-    </div>
-  );
 
-  const inp = (k: keyof typeof form, placeholder = "", type = "text") => (
-    <input
-      type={type}
-      className="w-full rounded-lg border px-3 py-2 text-sm"
-      style={{ borderColor: C.line, color: C.text }}
-      value={form[k]}
-      onChange={(e) => set(k, e.target.value)}
-      placeholder={placeholder}
-      disabled={isEdit && k === "price_rule_code"}
-    />
-  );
 
   return (
     <div
@@ -138,8 +130,8 @@ export default function RuleFormModal({ rule, phpRate, onDone, onError, onClose 
         </h3>
 
         <div className="grid grid-cols-2 gap-3">
-          <F label="代碼" required>{inp("price_rule_code", "e.g. PHP26_OT_S25_P8")}</F>
-          <F label="方案名稱" required>{inp("display_name", "e.g. Other 短課 8堂 PHP")}</F>
+          <F label="代碼" required><input type="text" className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: C.line, color: C.text }} value={form.price_rule_code} onChange={e => set("price_rule_code", e.target.value)} placeholder="e.g. PHP26_OT_S25_P8" disabled={isEdit} /></F>
+          <F label="方案名稱" required><input type="text" className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: C.line, color: C.text }} value={form.display_name} onChange={e => set("display_name", e.target.value)} placeholder="e.g. Other 短課 8堂 PHP" /></F>
         </div>
 
         <div className="grid grid-cols-3 gap-3">
@@ -192,7 +184,7 @@ export default function RuleFormModal({ rule, phpRate, onDone, onError, onClose 
               <option value="Package">Package 套裝</option>
             </select>
           </F>
-          <F label="堂數" required>{inp("lesson_count", "e.g. 8", "number")}</F>
+          <F label="堂數" required><input type="number" className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: C.line, color: C.text }} value={form.lesson_count} onChange={e => set("lesson_count", e.target.value)} placeholder="e.g. 8" /></F>
         </div>
 
         {/* 薪資制度選擇 */}
@@ -220,7 +212,7 @@ export default function RuleFormModal({ rule, phpRate, onDone, onError, onClose 
           {isPhp ? (
             <div className="space-y-2">
               <F label="老師薪資 PHP（每堂）" required>
-                {inp("teacher_payout_php", "e.g. 200", "number")}
+                <input type="number" className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: C.line, color: C.text }} value={form.teacher_payout_php} onChange={e => set("teacher_payout_php", e.target.value)} placeholder="e.g. 200" />
               </F>
               {parseFloat(form.teacher_payout_php) > 0 && (
                 <div className="text-xs px-2 py-1.5 rounded-lg"
@@ -232,14 +224,14 @@ export default function RuleFormModal({ rule, phpRate, onDone, onError, onClose 
             </div>
           ) : (
             <F label="老師薪資 NTD（每堂）" required>
-              {inp("teacher_payout_ntd", "e.g. 150", "number")}
+              <input type="number" className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: C.line, color: C.text }} value={form.teacher_payout_ntd} onChange={e => set("teacher_payout_ntd", e.target.value)} placeholder="e.g. 150" />
             </F>
           )}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <F label="售價 NTD" required>{inp("price_ntd", "e.g. 2700", "number")}</F>
-          <F label="Hanne 抽成 NTD（每堂）">{inp("hanne_share_ntd", "0", "number")}</F>
+          <F label="售價 NTD" required><input type="number" className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: C.line, color: C.text }} value={form.price_ntd} onChange={e => set("price_ntd", e.target.value)} placeholder="e.g. 2700" /></F>
+          <F label="Hanne 抽成 NTD（每堂）"><input type="number" className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: C.line, color: C.text }} value={form.hanne_share_ntd} onChange={e => set("hanne_share_ntd", e.target.value)} placeholder="0" /></F>
         </div>
 
         {/* Lee 利潤自動顯示 */}
