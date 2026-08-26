@@ -208,6 +208,29 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
   };
 
   // ── 動作 ──────────────────────────────────────────────────────────────────
+  const handleNoShow = (lessonId: string) => {
+    askConfirm({
+      title: "標記學生曠課",
+      message: "老師正常出席但學生未到。\n\n此堂將標記為完成並計入薪資，備註「學生曠課」。",
+      confirmLabel: "確認曠課",
+      onConfirm: async () => {
+        startTransition(async () => {
+          const res = await markLessonCompleted(lessonId);
+          if (res.error) showToast(res.error, false);
+          else {
+            // 自動填入曠課備註
+            await fetch("/api/lessons/note", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ lessonId, note: "學生曠課" }),
+            });
+            showToast("已標記曠課");
+          }
+        });
+      },
+    });
+  };
+
   const handleComplete = (lessonId: string) => {
     startTransition(async () => {
       const res = await markLessonCompleted(lessonId);
@@ -580,6 +603,9 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
                         <>
                           <Btn kind="good" size="sm" disabled={isPending} onClick={() => handleComplete(l.id)}>
                             完成
+                          </Btn>
+                          <Btn kind="ghost" size="sm" disabled={isPending} onClick={() => handleNoShow(l.id)}>
+                            曠課
                           </Btn>
                           <Btn
                             kind="ghost"
