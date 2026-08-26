@@ -183,7 +183,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
         teacher?.teacher_name || "",
         l.is_substitute ? (origTeacher?.teacher_name || "") : "",
         ({ general: "一般", makeup: "補課", extension: "延伸" } as Record<string,string>)[l.class_type] || l.class_type,
-        ({ scheduled: "待上", completed: "已完成", cancelled: "已取消" } as Record<string,string>)[l.status] || l.status,
+        ({ scheduled: "待上", completed: "已完成", cancelled: "已取消", pending_confirmation: "待確認" } as Record<string,string>)[l.status] || l.status,
         l.duration,
         l.payout_snapshot?.teacher_payout_ntd || 0,
         l.payout_snapshot?.hanne_share_ntd || 0,
@@ -443,6 +443,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
               const isCompleted = l.status === "completed";
               const isCancelled = l.status === "cancelled";
               const isScheduled = l.status === "scheduled";
+              const isPendingConfirmation = l.status === "pending_confirmation";
               const existingReportId = l.lesson_reports?.[0]?.id;
 
               return (
@@ -505,9 +506,9 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
                   </Td>
                   <Td>
                     <Badge
-                      tone={isCompleted ? "green" : isCancelled ? "gray" : l.date < today ? "red" : "navy"}
+                      tone={isCompleted ? "green" : isCancelled ? "gray" : isPendingConfirmation ? "gold" : l.date < today ? "red" : "navy"}
                     >
-                      {isCompleted ? "已完成" : isCancelled ? "已取消" : l.date < today ? "逾期" : "待上"}
+                      {isCompleted ? "已完成" : isCancelled ? "已取消" : isPendingConfirmation ? "待確認" : l.date < today ? "逾期" : "待上"}
                     </Badge>
                   </Td>
                   <Td>
@@ -555,6 +556,26 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
                   </Td>
                   <Td>
                     <div className="flex gap-1 flex-wrap">
+                      {isPendingConfirmation && (
+                        <>
+                          <Btn kind="good" size="sm" disabled={isPending} onClick={() => handleComplete(l.id)}>
+                            ✓ 確認完課
+                          </Btn>
+                          <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "cancel", lesson: l })}>
+                            取消
+                          </Btn>
+                        </>
+                      )}
+                      {isPendingConfirmation && (
+                        <>
+                          <Btn kind="good" size="sm" disabled={isPending} onClick={() => handleComplete(l.id)}>
+                            ✓ 確認完課
+                          </Btn>
+                          <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "cancel", lesson: l })}>
+                            取消
+                          </Btn>
+                        </>
+                      )}
                       {isScheduled && (
                         <>
                           <Btn kind="good" size="sm" disabled={isPending} onClick={() => handleComplete(l.id)}>
@@ -644,6 +665,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
               const isCompleted = l.status === "completed";
               const isCancelled = l.status === "cancelled";
               const isScheduled = l.status === "scheduled";
+              const isPendingConfirmation = l.status === "pending_confirmation";
               const existingReportId = l.lesson_reports?.[0]?.id;
               return (
                 <MobileCard key={l.id} faded={isCancelled} selected={selected.has(l.id)}>

@@ -58,6 +58,9 @@ export default async function DashboardPage() {
   const overdueLessons = lessons.filter(
     (l) => l.is_active && l.status === "scheduled" && l.date < today
   );
+  const pendingConfirmationLessons = lessons.filter(
+    (l) => l.is_active && l.status === "pending_confirmation"
+  );
 
   // 正在陪伴的學生
   const activeStudentIds = new Set<string>();
@@ -194,6 +197,20 @@ export default async function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* 待確認完課 banner */}
+      {pendingConfirmationLessons.length > 0 && (
+        <div
+          className="rounded-xl px-4 py-3 text-sm font-medium flex items-center justify-between gap-3 flex-wrap"
+          style={{ background: "#E8F5E9", color: "#2E7D32", border: "1px solid #A5D6A7" }}
+        >
+          <span>✓ 有 {pendingConfirmationLessons.length} 堂課老師已上傳報告，等待確認完課</span>
+          <a href="/lessons?filter=pending_confirmation"
+            className="text-sm font-semibold underline" style={{ color: "#1B5E20" }}>
+            前往確認 →
+          </a>
+        </div>
+      )}
 
       {/* 逾期 banner */}
       {overdueLessons.length > 0 && (
