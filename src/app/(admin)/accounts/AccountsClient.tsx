@@ -132,37 +132,37 @@ function OpenAccountForm({
   };
   const selectedRule = priceRules.find((r) => r.price_rule_code === ruleCode);
   const lessonCount = selectedRule ? selectedRule.lesson_count : 0;
-  const canSave = studentId && (snapChoice === "prev" ? (!!prevSnap && !!prevLessonRuleCode) : (!!ruleCode && !!courseLabel));
+  const canSave = studentId && (snapChoice === "prev" ? !!prevSnap : (!!ruleCode && !!courseLabel));
 
   const handleSave = () => {
     if (!canSave) return;
     const rule = selectedRule;
     // 沿用舊 snapshot 或從 rule 計算
-    if (snapChoice === "prev" && prevSnap && prevLessonRuleCode) {
-      const oldRule = priceRules.find(r => r.price_rule_code === prevLessonRuleCode);
-      if (!oldRule) return;
-      const perLesson = Math.round(oldRule.price_ntd / oldRule.lesson_count);
-      const lee = perLesson - oldRule.teacher_payout_ntd - oldRule.hanne_share_ntd;
+    if (snapChoice === "prev" && prevSnap) {
+      // 直接沿用上次 snapshot 凍結數字，完全不依賴 price_rules
+      const snap = prevSnap.snapshot;
+      const lee = (snap.original_price_ntd || 0)
+        - ((snap.teacher_payout_ntd || 0) * (snap.lesson_count || 1))
+        - ((snap.hanne_share_ntd || 0) * (snap.lesson_count || 1));
       const newSnapshot = {
-        original_price_ntd: oldRule.price_ntd,
-        lesson_count: oldRule.lesson_count,
-        teacher_payout_ntd: oldRule.teacher_payout_ntd,
-        teacher_payout_currency: (oldRule.teacher_payout_currency || 'NTD') as 'NTD' | 'PHP',
-        teacher_payout_php: oldRule.teacher_payout_php || null,
-        hanne_share_ntd: oldRule.hanne_share_ntd,
+        original_price_ntd: snap.original_price_ntd,
+        lesson_count: snap.lesson_count,
+        teacher_payout_ntd: snap.teacher_payout_ntd,
+        teacher_payout_currency: (snap.teacher_payout_currency || 'NTD') as 'NTD' | 'PHP',
+        teacher_payout_php: snap.teacher_payout_php || null,
+        hanne_share_ntd: snap.hanne_share_ntd || 0,
         lee_commission_ntd: lee,
       };
-      const autoLabel = oldRule.display_name.replace("(舊價)", "").trim();
       onSave({
         student_id: studentId,
-        course_label: courseLabel || autoLabel,
+        course_label: courseLabel || prevSnap.course_label || '',
         teacher_type: prevSnap.teacher_type as "Hanne" | "Other",
         course_family: "General",
         duration_type: prevSnap.duration_type as "Short25" | "Long55" | "Trial25",
         billing_type: "Package",
-        total_lessons: oldRule.lesson_count,
+        total_lessons: snap.lesson_count || prevLessonCount,
         is_trial: false,
-        price_rule_code: prevLessonRuleCode,
+        price_rule_code: '',
         payment_date: paymentDate,
         note,
         snapshot: newSnapshot,
@@ -248,63 +248,24 @@ function OpenAccountForm({
         </div>
       )}
 
-      {/* 沿用上次：只填課程標籤 */}
+      {/* 沿用上次：直接用 snapshot 凍結數字，不依賴 price_rules */}
       {prevSnap && snapChoice === "prev" && (() => {
-        // 過濾出舊價方案(_V1)且符合該學生 teacher_type + duration_type
-        const oldRules = priceRules.filter(r =>
-          r.price_rule_code.endsWith("_V1") &&
-          r.teacher_type === prevSnap.teacher_type &&
-          r.duration_type === prevSnap.duration_type
-        ).sort((a, b) => a.lesson_count - b.lesson_count);
+        const snap = prevSnap.snapshot;
+        const totalLee = (snap.original_price_ntd || 0)
+          - ((snap.teacher_payout_ntd || 0) * (snap.lesson_count || 1))
+          - ((snap.hanne_share_ntd || 0) * (snap.lesson_count || 1));
         return (
           <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-semibold mb-1" style={{ color: C.muted }}>
-                選擇舊價格方案 <span style={{ color: C.red }}>*</span>
-              </label>
-              {oldRules.length > 0 ? (
-                <select
-                  className="w-full rounded-lg border px-3 py-2 text-sm"
-                  style={{ borderColor: C.line, color: C.text }}
-                  value={prevLessonRuleCode}
-                  onChange={(e) => {
-                    setPrevLessonRuleCode(e.target.value);
-                    const r = oldRules.find(r => r.price_rule_code === e.target.value);
-                    if (r) {
-                      setPrevLessonCount(r.lesson_count);
-                      setCourseLabel(r.display_name.replace("(舊價)", "").trim());
-                    }
-                  }}
-                >
-                  <option value="" disabled>選擇方案...</option>
-                  {oldRules.map(r => (
-                    <option key={r.price_rule_code} value={r.price_rule_code}>
-                      {r.display_name} · NT$ {money(r.price_ntd)}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <div className="text-xs py-2" style={{ color: C.amber }}>
-                  找不到對應的舊價方案，請選「用新價格規則」。
-                </div>
-              )}
+            <div className="rounded-lg p-3 text-xs space-y-1" style={{ background: "#EAF0F6", color: C.navy }}>
+              <div className="font-semibold mb-1">沿用上次凍結費率</div>
+              <div className="flex justify-between"><span>課程總費用</span><span>NT$ {money(snap.original_price_ntd || 0)}</span></div>
+              <div className="flex justify-between"><span>老師抽成／堂</span><span>NT$ {money(snap.teacher_payout_ntd || 0)}</span></div>
+              <div className="flex justify-between"><span>堂數</span><span>{snap.lesson_count || 0} 堂</span></div>
+              <div className="flex justify-between font-medium" style={{ color: C.green }}>
+                <span>Lee 收入（總額）</span>
+                <span>NT$ {money(totalLee)}</span>
+              </div>
             </div>
-            {prevLessonRuleCode && (() => {
-              const r = oldRules.find(r => r.price_rule_code === prevLessonRuleCode);
-              if (!r) return null;
-              const perLesson = Math.round(r.price_ntd / r.lesson_count);
-              const lee = perLesson - r.teacher_payout_ntd - r.hanne_share_ntd;
-              return (
-                <div className="rounded-lg p-3 text-xs space-y-1" style={{ background: "#EAF0F6", color: C.navy }}>
-                  <div className="font-semibold mb-1">凍結價格預覽(舊費率)</div>
-                  <div className="flex justify-between"><span>課程總費用</span><span>NT$ {money(r.price_ntd)}</span></div>
-                  <div className="flex justify-between"><span>老師抽成／堂</span><span>NT$ {money(r.teacher_payout_ntd)}</span></div>
-                  <div className="flex justify-between font-medium" style={{ color: C.green }}>
-                    <span>Lee 收入／堂</span><span>NT$ {money(lee)}</span>
-                  </div>
-                </div>
-              );
-            })()}
           </div>
         );
       })()}
