@@ -694,8 +694,8 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
                       <div className="text-[12px]" style={{ color: C.muted }}>{teacher?.teacher_name || "—"}</div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      <Badge tone={isCompleted ? "green" : isCancelled ? "gray" : l.date < today ? "red" : "navy"}>
-                        {isCompleted ? "已完成" : isCancelled ? "已取消" : l.date < today ? "逾期" : "待上"}
+                      <Badge tone={isCompleted ? "green" : isCancelled ? "gray" : isPendingConfirmation ? "gold" : l.date < today ? "red" : "navy"}>
+                        {isCompleted ? "已完成" : isCancelled ? "已取消" : isPendingConfirmation ? "待確認" : l.date < today ? "逾期" : "待上"}
                       </Badge>
                       <Badge tone={CLASS_TYPE_TONE[l.class_type] || "gray"}>
                         {CLASS_TYPE_LABEL[l.class_type] || l.class_type}
@@ -710,10 +710,21 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
                     </div>
                   )}
                   <div className="flex gap-1 flex-wrap mt-1">
+                    {isPendingConfirmation && (
+                      <>
+                        <Btn kind="good" size="sm" disabled={isPending} onClick={() => handleComplete(l.id)}>✓ 確認完課</Btn>
+                        <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "cancel", lesson: l })}>取消</Btn>
+                      </>
+                    )}
                     {isScheduled && (
                       <>
                         <Btn kind="good" size="sm" disabled={isPending} onClick={() => handleComplete(l.id)}>完成</Btn>
+                        <Btn kind="ghost" size="sm" disabled={isPending} onClick={() => handleNoShow(l.id)}>曠課</Btn>
                         <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "cancel", lesson: l })}>取消</Btn>
+                        <Btn kind="ghost" size="sm" onClick={() => {
+                          const acc = accountById[l.account_id];
+                          if (acc) setModal({ kind: "substitute", lessons: [l], account: acc });
+                        }}>代課</Btn>
                         <Btn kind="danger" size="sm" onClick={() => handleDeleteLesson(l)}>刪除</Btn>
                       </>
                     )}
