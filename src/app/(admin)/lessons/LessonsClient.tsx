@@ -589,16 +589,6 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
                           </Btn>
                         </>
                       )}
-                      {isPendingConfirmation && (
-                        <>
-                          <Btn kind="good" size="sm" disabled={isPending} onClick={() => handleComplete(l.id)}>
-                            ✓ 確認完課
-                          </Btn>
-                          <Btn kind="ghost" size="sm" onClick={() => setModal({ kind: "cancel", lesson: l })}>
-                            取消
-                          </Btn>
-                        </>
-                      )}
                       {isScheduled && (
                         <>
                           <Btn kind="good" size="sm" disabled={isPending} onClick={() => handleComplete(l.id)}>
