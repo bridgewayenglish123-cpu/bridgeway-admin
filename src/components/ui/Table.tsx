@@ -32,9 +32,9 @@ export function Table({
   );
 }
 
-export function Td({ children, ...p }: React.TdHTMLAttributes<HTMLTableCellElement>) {
+export function Td({ children, style, ...p }: React.TdHTMLAttributes<HTMLTableCellElement>) {
   return (
-    <td {...p} className="px-3 py-2.5 align-middle" style={{ color: C.text }}>
+    <td {...p} className="px-3 py-2.5 align-middle" style={{ color: C.text, ...style }}>
       {children}
     </td>
   );
