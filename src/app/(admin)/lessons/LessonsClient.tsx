@@ -577,7 +577,7 @@ export default function LessonsClient({ lessons, students, teachers, accounts, p
                       </button>
                     )}
                   </Td>
-                  <Td>
+                  <Td style={{ position: 'sticky', right: 0, background: '#fff', boxShadow: '-2px 0 4px rgba(0,0,0,0.06)' }}>
                     <div className="flex gap-1 flex-wrap">
                       {isPendingConfirmation && (
                         <>
