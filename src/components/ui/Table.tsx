@@ -12,7 +12,7 @@ export function Table({
 }) {
   return (
     <div className={mobileCard ? "hidden md:block" : "-mx-3 md:mx-0 overflow-x-auto bw-scroll"}>
-      <table className="w-full text-sm" style={{ borderCollapse: "collapse", minWidth: "min-content" }}>
+      <table className="w-full text-sm" style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: "min-content" }}>
         <thead>
           <tr style={{ borderBottom: `1px solid ${C.line}` }}>
             {head.map((h, i) => (
